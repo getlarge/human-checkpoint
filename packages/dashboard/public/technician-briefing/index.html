@@ -33,19 +33,23 @@
           </li>
           <li>
             <a id="nav-source" href="#research"
-              >Public source check<small>Waiting for your decision</small></a
+              >Public source check<small id="nav-source-label"
+                >Waiting for assistant review</small
+              ></a
             >
           </li>
           <li>
             <a id="nav-release" href="#release"
-              >Work order approval<small>Review and release</small></a
+              >Work order approval<small id="nav-release-label"
+                >Waiting for technician brief</small
+              ></a
             >
           </li>
         </ol>
       </nav>
       <main id="main" tabindex="-1">
         <div class="page-heading">
-          <h1>Verify the work order before it leaves the field</h1>
+          <h1 id="page-title">Prepare and release this work order</h1>
           <p id="page-lead">
             The assistant can prepare the job, but it must stop for your
             approval before checking public sources or releasing the work order.
@@ -106,7 +110,7 @@
                   <h2 id="research-heading">
                     Approve a check of public sources
                   </h2>
-                  <p>
+                  <p id="research-lead">
                     The assistant wants to check four results from the listed
                     manufacturer and maintenance sources.
                   </p>
@@ -155,7 +159,7 @@
                   type="button"
                   disabled
                 >
-                  Touch YubiKey to approve
+                  Approve source check with YubiKey
                 </button>
                 <button id="run-research" type="button" disabled>
                   Continue preparing the brief
@@ -188,7 +192,7 @@ The request-specific public key appears after approval.</pre
                   <h2 id="release-heading">
                     Review and approve this work order
                   </h2>
-                  <p>
+                  <p id="release-lead">
                     Your field note and the assistant’s completed brief will be
                     locked together in the approval record.
                   </p>
@@ -199,7 +203,7 @@ The request-specific public key appears after approval.</pre
               </div>
               <div class="field">
                 <label for="field-amendment"
-                  >Field amendment <span aria-hidden="true">*</span></label
+                  >Field note <span aria-hidden="true">*</span></label
                 >
                 <textarea
                   id="field-amendment"
@@ -209,8 +213,8 @@ The request-specific public key appears after approval.</pre
 Install a temporary exclusion marker at the south access point before restart.</textarea
                 >
                 <span id="amendment-hint" class="hint"
-                  >Required. Once you prepare the approval, changing this note
-                  requires a new approval request.</span
+                  >Required. Locking this work order binds the note to the
+                  approval; any change requires a new approval request.</span
                 >
               </div>
               <div class="field">
@@ -236,7 +240,7 @@ Install a temporary exclusion marker at the south access point before restart.</
               </dl>
               <div class="actions">
                 <button id="prepare-release" type="button" disabled>
-                  Review final approval
+                  Lock work order for approval
                 </button>
                 <button
                   id="sign-release"
@@ -244,7 +248,7 @@ Install a temporary exclusion marker at the south access point before restart.</
                   type="button"
                   disabled
                 >
-                  Touch YubiKey to approve work order
+                  Approve work order with YubiKey
                 </button>
                 <button id="finalize-release" type="button" disabled>
                   Release approved work order
@@ -299,7 +303,7 @@ The request-specific public key appears after approval.</pre
                   type="button"
                   disabled
                 >
-                  Check downloaded record
+                  Verify downloaded record offline
                 </button>
                 <button
                   id="tamper-proof"
@@ -307,7 +311,7 @@ The request-specific public key appears after approval.</pre
                   type="button"
                   disabled
                 >
-                  Show tamper detection
+                  Change one character and verify again
                 </button>
               </div>
               <details>

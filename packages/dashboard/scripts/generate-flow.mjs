@@ -60,7 +60,7 @@ if (priorApproval && !['expired', 'rejected'].includes(priorApproval.status)) th
 msg.payload = {
   title: 'Review ' + request.id + ' before public source check',
   tags: ['human-checkpoint', 'service-request', 'request-review'],
-  brief: 'Review the active support request, the approved same-customer history, and the manual record supplied as task context. Return a FreeformOutput whose first artifact has kind "public-source-proposal" and a JSON body with grounded=true, requestId, historySummary, queries, reason, questionsToCheck, and unknowns. Supply 1 to 3 concise public-equipment queries. Queries may use the public asset model and symptom class, but must not contain the customer name, site, support-request ID, or asset ID. Do not call any public-source tool in this task. Treat past resolutions as comparison points, never as a diagnosis. After submit_freeform_output succeeds, stop.',
+  brief: 'Review the active support request, the approved same-customer history, and the manual record supplied as task context. Return a FreeformOutput whose first artifact has kind "public-source-proposal" and a JSON body with grounded=true, requestId, historySummary, queries, reason, questionsToCheck, and unknowns. Supply 1 to 3 concise public-equipment queries. Queries may use the public asset model and symptom class, but must not contain the customer name, site, support-request ID, or asset ID. Do not call any public-source tool in this task. Treat past resolutions as comparison points, never as a diagnosis. Call submit_freeform_output with only summary and artifacts; omit proposedTaskType and verification. After submit_freeform_output succeeds, stop.',
   contexts: [
     { slug: 'active-request', binding: 'user_inline', value: request },
     { slug: 'approved-customer-history', binding: 'context_inline', value: history },
@@ -176,7 +176,7 @@ if (!review || !reviewRef || !approval) throw new Error('Complete the request re
 msg.payload = {
   title: 'Prepare technician brief for ' + request.id,
   tags: ['human-checkpoint', 'service-request', 'technician-brief'],
-  brief: 'Prepare a concise pre-visit technician brief for the active request. First call approved_public_source_check exactly once with only the signingRequestId supplied in context. If the tool denies the request or fails, do not substitute web research and do not submit a brief. Return a FreeformOutput whose first artifact has kind "technician-brief" and a JSON body with grounded=true, requestId, approvalRequestId, title, requestSummary, findings, questionsToCheck, unknowns, and sources. Sources must be HTTPS results returned by the approved tool and contain title and url. Preserve the reviewed questions and unknowns without inventing a diagnosis, root cause, or repair instruction. Past resolutions are comparisons only. After submit_freeform_output succeeds, stop.',
+  brief: 'Prepare a concise pre-visit technician brief for the active request. First call approved_public_source_check exactly once with only the signingRequestId supplied in context. If the tool denies the request or fails, do not substitute web research and do not submit a brief. Return a FreeformOutput whose first artifact has kind "technician-brief" and a JSON body with grounded=true, requestId, approvalRequestId, title, requestSummary, findings, questionsToCheck, unknowns, and sources. Sources must be HTTPS results returned by the approved tool and contain title and url. Preserve the reviewed questions and unknowns without inventing a diagnosis, root cause, or repair instruction. Past resolutions are comparisons only. Call submit_freeform_output with only summary and artifacts; omit proposedTaskType and verification. After submit_freeform_output succeeds, stop.',
   contexts: [
     { slug: 'active-request', binding: 'user_inline', value: request },
     { slug: 'validated-request-review', binding: 'context_inline', value: review },
@@ -240,14 +240,14 @@ return msg;`,
   workflowLoad('release-prepare-load', 500, ['build-release-payload']),
   functionNode(
     'build-release-payload',
-    'Bind brief and field amendment',
+    'Bind brief and field note',
     `const step = msg.workflowSnapshot.steps.find((item) => item.stepKey === 'prepare-brief' && item.status === 'completed');
 const brief = step?.result?.artifactBody;
 if (!brief || msg.workflowSnapshot.workflow.state !== 'brief-ready') throw new Error('The assistant brief must be complete before work-order approval.');
 const priorApproval = msg.workflowSnapshot.approvals.find((item) => item.decision === 'work-order-release');
 if (priorApproval && !['expired', 'rejected'].includes(priorApproval.status)) throw new Error('A work-order approval already exists. Refresh it instead of changing the field note.');
 const amendment = String(msg.req.body?.fieldAmendment || '').trim();
-if (!amendment) throw new Error('Add the required field amendment before requesting approval.');
+if (!amendment) throw new Error('Add the required field note before requesting approval.');
 msg.teamId = env.get('HUMAN_CHECKPOINT_TEAM_ID');
 msg.fieldAmendment = amendment;
 msg.payload = {

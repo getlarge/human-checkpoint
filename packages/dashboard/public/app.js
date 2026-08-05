@@ -157,7 +157,7 @@ async function checkSession() {
   const authenticated = response.ok;
   setStatus(
     'session-status',
-    authenticated ? 'Technician signed in' : 'Sign-in required',
+    authenticated ? 'Team member signed in' : 'Sign-in required',
     authenticated ? 'ready' : 'attention',
   );
   setStatus(
@@ -235,12 +235,16 @@ function renderCredential(credential) {
   }
   $('credential-record').hidden = false;
   $('credential-name').textContent = credential.label;
-  $('credential-state').textContent = credential.status.replace('_', ' ');
+  $('credential-state').textContent = statusText(credential.status);
   $('credential-method').textContent = credential.verificationMethod;
   $('credential-id').textContent = credential.id;
   setStatus(
     'credential-label',
-    credential.status.replace('_', ' '),
+    credential.status === 'active'
+      ? 'Ready'
+      : credential.status === 'pending_approval'
+        ? 'Waiting for manager'
+        : statusText(credential.status),
     credential.status,
   );
   setNotice(
@@ -314,7 +318,7 @@ async function enrollCredential() {
     await loadCredentials();
     setNotice(
       'credential-notice',
-      'Enrollment and registration completed. Activate the pending credential.',
+      'Enrollment completed. A different team credential manager must sign in once to activate this key.',
       'success',
     );
   } finally {
@@ -327,15 +331,27 @@ async function activateCredential() {
   const button = $('activate-action');
   setBusy(button, true, 'Activating…');
   try {
-    await signing(
-      `/crypto/signing-credentials/${button.dataset.credentialId}/approve`,
-      {
-        method: 'POST',
-        body: JSON.stringify({
-          reason: 'Human Checkpoint hackathon demo activation',
-        }),
-      },
-    );
+    try {
+      await signing(
+        `/crypto/signing-credentials/${button.dataset.credentialId}/approve`,
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            reason: 'Human Checkpoint local demo activation',
+          }),
+        },
+      );
+    } catch (error) {
+      if (
+        error instanceof Error &&
+        error.message === 'Credential cannot transition to active'
+      ) {
+        throw new Error(
+          'The person who enrolled this YubiKey cannot activate it. Sign out and ask the seeded credential manager to complete this one-time step.',
+        );
+      }
+      throw error;
+    }
     await loadCredentials();
   } finally {
     setBusy(button, false);
@@ -422,18 +438,39 @@ function renderJourney() {
   const reviewComplete = journey.tasks?.some(
     (task) => task.taskRole === 'request-review' && task.status === 'completed',
   );
+  const immutable = Boolean(journey.brief?.immutable);
+  const researchComplete = journey.research?.status === 'completed';
+  const releaseComplete = journey.release?.status === 'completed';
+  const released = Boolean(journey.releasedAt);
   if (request) {
     $('brand-request').textContent = `Service request ${request.id}`;
     $('request-nav-label').textContent = `${request.id} · ${request.assetId}`;
     $('brief-asset').textContent = request.assetName;
     $('brief-symptom').textContent = request.summary;
-    $('page-lead').textContent =
-      `The assistant is preparing ${request.id}. It must stop for your approval before checking public sources or releasing the work order.`;
+    $('page-title').textContent = released
+      ? `${request.id} work order released`
+      : immutable
+        ? 'Review and approve this work order'
+        : `Prepare the ${request.id} work order`;
+    $('page-lead').textContent = released
+      ? 'MoltNet revalidated both approvals before closing the request. The approval record is ready for offline checking.'
+      : immutable
+        ? 'The assistant brief is locked. Add the required field note, then approve and release the exact work order shown.'
+        : `The assistant is preparing ${request.id}. It cannot check public sources or release the work order without your YubiKey approval.`;
   }
   renderCheckpoint('research', journey.research);
   renderCheckpoint('release', journey.release);
   renderTasks(journey.tasks || []);
-  const immutable = Boolean(journey.brief?.immutable);
+  $('nav-source-label').textContent = checkpointNavigationText(
+    'research',
+    journey.research,
+    { reviewComplete, immutable, released },
+  );
+  $('nav-release-label').textContent = checkpointNavigationText(
+    'release',
+    journey.release,
+    { reviewComplete, immutable, released },
+  );
   setCurrentStep(
     immutable || journey.release?.requestId
       ? 'nav-release'
@@ -467,8 +504,6 @@ function renderJourney() {
   $('shift').disabled = releaseLocked;
   if (journey.release?.fieldAmendment)
     $('field-amendment').value = journey.release.fieldAmendment;
-  const researchComplete = journey.research?.status === 'completed';
-  const releaseComplete = journey.release?.status === 'completed';
   if (researchComplete) $('trace-research').dataset.state = 'complete';
   if (reviewComplete) {
     $('trace-draft').dataset.state = 'complete';
@@ -476,6 +511,14 @@ function renderJourney() {
   if (immutable) $('trace-brief').dataset.state = 'complete';
   if (releaseComplete) $('trace-release').dataset.state = 'complete';
   $('export-proof').disabled = !releaseComplete;
+  if (releaseComplete && !lastProof) {
+    setStatus('proof-state', 'Ready to download', 'pending');
+    setNotice(
+      'proof-notice',
+      'Both approvals are complete. Download the record to verify both signatures without MoltNet or the YubiKey.',
+      'success',
+    );
+  }
   if (researchComplete && releaseComplete) {
     const left = JSON.stringify(journey.research.derivedPublicKey);
     const right = JSON.stringify(journey.release.derivedPublicKey);
@@ -491,7 +534,7 @@ function renderJourney() {
 }
 
 function renderCheckpoint(kind, value = {}) {
-  const title = value.status ? value.status.replace('-', ' ') : 'not requested';
+  const title = checkpointStatusText(value.status);
   setStatus(`${kind}-state`, title, value.status);
   $(`${kind}-request-id`).textContent = value.requestId || '—';
   $(`${kind}-expiry`).textContent = value.expiresAt
@@ -505,6 +548,20 @@ function renderCheckpoint(kind, value = {}) {
   const requested = Boolean(value.requestId);
   const pending = value.status === 'pending' || value.status === 'claimed';
   if (kind === 'research') {
+    $('research-heading').textContent =
+      value.status === 'completed'
+        ? 'Approved public-source check'
+        : ['expired', 'rejected'].includes(value.status)
+          ? 'Prepare a fresh public-source approval'
+          : 'Approve a check of public sources';
+    $('research-lead').textContent =
+      value.status === 'completed'
+        ? 'The assistant checked only the approved manufacturer and maintenance sources shown below.'
+        : value.status === 'expired'
+          ? 'The previous approval expired before use. Prepare a fresh source check before the assistant can continue.'
+          : value.status === 'rejected'
+            ? 'The previous source check was rejected. Prepare a new scope only if the work still requires it.'
+            : 'The assistant wants to check up to four results from the listed manufacturer and maintenance sources.';
     const scope = value.scope;
     if (scope) {
       $('research-queries').textContent = Array.isArray(scope.queries)
@@ -533,11 +590,59 @@ function renderCheckpoint(kind, value = {}) {
       value.status === 'completed' ? 'success' : 'hardware',
     );
   } else {
+    $('release-heading').textContent = journey.releasedAt
+      ? 'Released work order'
+      : value.status === 'completed'
+        ? 'Approved work order'
+        : ['expired', 'rejected'].includes(value.status)
+          ? 'Prepare a fresh work-order approval'
+          : 'Review and approve this work order';
+    $('release-lead').textContent = journey.releasedAt
+      ? 'MoltNet revalidated the locked brief, field note, role, and shift before release.'
+      : value.status === 'completed'
+        ? 'Hardware approval is complete. Release the exact locked work order when ready.'
+        : value.status === 'expired'
+          ? 'The previous approval expired. Review the work order again and prepare a fresh request.'
+          : value.status === 'rejected'
+            ? 'The previous work-order approval was rejected. Review the brief and field note before trying again.'
+            : 'Your field note and the assistant’s completed brief will be locked together in the approval record.';
     $('sign-release').disabled = !pending;
     $('refresh-release').disabled = !requested;
     $('finalize-release').disabled =
       value.status !== 'completed' || Boolean(journey.releasedAt);
   }
+}
+
+function checkpointStatusText(status) {
+  if (status === 'completed') return 'Approved';
+  if (status === 'pending') return 'Awaiting approval';
+  if (status === 'claimed') return 'Approval in progress';
+  if (status === 'expired') return 'Expired';
+  if (status === 'rejected') return 'Rejected';
+  return 'Not requested';
+}
+
+function checkpointNavigationText(kind, checkpoint = {}, state) {
+  if (kind === 'research') {
+    if (checkpoint.status === 'completed')
+      return 'Approved · source check complete';
+    if (['pending', 'claimed'].includes(checkpoint.status))
+      return 'Your YubiKey approval is required';
+    if (['expired', 'rejected'].includes(checkpoint.status))
+      return 'Prepare a fresh approval';
+    return state.reviewComplete
+      ? 'Ready for your review'
+      : 'Waiting for assistant review';
+  }
+  if (state.released) return 'Released · approval record ready';
+  if (checkpoint.status === 'completed') return 'Approved · ready to release';
+  if (['pending', 'claimed'].includes(checkpoint.status))
+    return 'Your YubiKey approval is required';
+  if (['expired', 'rejected'].includes(checkpoint.status))
+    return 'Prepare a fresh approval';
+  return state.immutable
+    ? 'Add field note and review'
+    : 'Waiting for technician brief';
 }
 
 function setCurrentStep(activeId) {
@@ -736,6 +841,7 @@ function requestLabel(status, count) {
 
 function statusText(status) {
   if (status === 'pending-review') return 'Pending review';
+  if (status === 'pending_approval') return 'Pending approval';
   return status.charAt(0).toUpperCase() + status.slice(1);
 }
 
@@ -819,7 +925,12 @@ async function initBriefing() {
       URL.revokeObjectURL(link.href);
       $('verify-proof').disabled = false;
       $('tamper-proof').disabled = false;
-      setStatus('proof-state', 'Exported', 'completed');
+      setStatus('proof-state', 'Downloaded', 'completed');
+      setNotice(
+        'proof-notice',
+        'Approval record downloaded. Verify it locally, then try the one-character change to see the signature check fail.',
+        'success',
+      );
     }),
   );
   $('verify-proof').addEventListener('click', () =>

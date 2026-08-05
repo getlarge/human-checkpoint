@@ -550,10 +550,10 @@ pre {
 .agent-work {
   margin-top: 1.25rem;
   padding-top: 1rem;
-  border-top: 1px solid var(--line);
+  border-top: 1px solid var(--rule);
 }
 .agent-work > p {
-  color: var(--muted);
+  color: var(--ink-muted);
   margin-top: 0.35rem;
 }
 .agent-work ol {
@@ -567,7 +567,7 @@ pre {
   display: block;
 }
 .agent-work li small {
-  color: var(--muted);
+  color: var(--ink-muted);
   margin-top: 0.15rem;
   overflow-wrap: anywhere;
 }

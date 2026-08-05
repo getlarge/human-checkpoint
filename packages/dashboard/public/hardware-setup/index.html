@@ -41,8 +41,8 @@
         <div class="page-heading">
           <h1>Set up your YubiKey for work approvals</h1>
           <p>
-            Enroll one compatible YubiKey, touch it when prompted, then activate
-            it for this service team.
+            Enroll one compatible YubiKey and touch it when prompted. A
+            different team credential manager activates it once before use.
           </p>
         </div>
         <div class="work-layout">
@@ -50,7 +50,7 @@
             <section class="work-order" aria-labelledby="sign-in-heading">
               <div class="section-heading">
                 <div>
-                  <h2 id="sign-in-heading">Technician session</h2>
+                  <h2 id="sign-in-heading">Team member session</h2>
                   <p>
                     Human authorization stays separate from the agent
                     credential.
@@ -146,7 +146,7 @@
                   Enroll YubiKey
                 </button>
                 <button id="activate-action" type="button" hidden>
-                  Activate credential
+                  Activate as credential manager
                 </button>
                 <a
                   id="briefing-action"
@@ -173,7 +173,7 @@
               <li id="trace-session">
                 <div>
                   <strong>Signed in</strong
-                  ><small>Confirms you can act for this service team</small>
+                  ><small>Confirms your role in this service team</small>
                 </div>
               </li>
               <li id="trace-companion">
@@ -193,7 +193,10 @@
               <li id="trace-activation">
                 <div>
                   <strong>Ready for work</strong
-                  ><small>Activates the key for this service team</small>
+                  ><small
+                    >A different credential manager activates the technician's
+                    key</small
+                  >
                 </div>
               </li>
             </ol>

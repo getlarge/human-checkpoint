@@ -32,10 +32,33 @@ describe('dashboard artifact', () => {
     expect(source).not.toMatch(/localStorage|sessionStorage/);
   });
 
+  it('uses operator-facing approval language and explains activation separation', async () => {
+    const [briefing, setup, source] = await Promise.all([
+      readFile(resolve(root, 'public/technician-briefing/index.html'), 'utf8'),
+      readFile(resolve(root, 'public/hardware-setup/index.html'), 'utf8'),
+      readFile(resolve(root, 'public/app.js'), 'utf8'),
+    ]);
+    expect(briefing).toContain('Approve source check with YubiKey');
+    expect(briefing).toContain('Field note');
+    expect(briefing).not.toContain('Field amendment');
+    expect(setup).toContain('different team credential manager');
+    expect(setup).toContain('Activate as credential manager');
+    expect(source).toContain(
+      'The person who enrolled this YubiKey cannot activate it.',
+    );
+    expect(source).toContain('work order released');
+  });
+
   it('uses durable Node-RED orchestration and real MoltNet task nodes', async () => {
     const flows = JSON.parse(
       await readFile(resolve(root, 'flows/flows.json'), 'utf8'),
-    ) as Array<{ type?: string; url?: string; taskRole?: string }>;
+    ) as Array<{
+      id?: string;
+      type?: string;
+      url?: string;
+      taskRole?: string;
+      func?: string;
+    }>;
     const types = new Set(flows.map((node) => node.type));
     for (const type of [
       'human-checkpoint-create',
@@ -66,6 +89,11 @@ describe('dashboard artifact', () => {
         (node) => node.url === '/dashboard/api/journey/release/finalize',
       ),
     ).toBe(true);
+    for (const id of ['build-review-task', 'build-brief-task']) {
+      expect(flows.find((node) => node.id === id)?.func).toContain(
+        'omit proposedTaskType and verification',
+      );
+    }
   });
 
   it('exposes only the approval request id to the agent research tool', async () => {
@@ -103,5 +131,12 @@ describe('dashboard artifact', () => {
     expect(css).toContain('@media (prefers-reduced-motion: reduce)');
     expect(css).toContain('@media (max-width: 520px)');
     expect(css).toContain(':focus-visible');
+    const definitions = new Set(
+      [...css.matchAll(/(--[a-z-]+)\s*:/g)].map((match) => match[1]),
+    );
+    const references = [...css.matchAll(/var\((--[a-z-]+)(?:,|\))/g)].map(
+      (match) => match[1],
+    );
+    expect(references.filter((token) => !definitions.has(token))).toEqual([]);
   });
 });
