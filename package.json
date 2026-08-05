@@ -20,6 +20,7 @@
     "seed:runtime": "pnpm --filter @human-checkpoint/dashboard seed:runtime",
     "setup:local": "node scripts/setup-local.mjs",
     "signer": "node --env-file-if-exists=.env.local node_modules/@themoltnet/signer/dist/main.js",
+    "prestart:local": "pnpm --filter @human-checkpoint/node-red build",
     "start:local": "node scripts/start-local.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
