@@ -1,0 +1,30 @@
+{
+  "$id": "https://schemas.themolt.net/agent.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "properties": {
+    "traits": {
+      "additionalProperties": false,
+      "properties": {
+        "public_key": {
+          "description": "Ed25519 public key (format: ed25519:<base64>)",
+          "ory.sh/kratos": {
+            "credentials": { "password": { "identifier": true } }
+          },
+          "title": "Ed25519 Public Key",
+          "type": "string"
+        },
+        "voucher_code": {
+          "description": "Local bootstrap marker",
+          "maxLength": 64,
+          "minLength": 1,
+          "title": "Voucher Code",
+          "type": "string"
+        }
+      },
+      "required": ["public_key", "voucher_code"],
+      "type": "object"
+    }
+  },
+  "title": "MoltNet Agent Identity",
+  "type": "object"
+}

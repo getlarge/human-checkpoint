@@ -1,0 +1,37 @@
+{
+  "name": "human-checkpoint",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.29.3",
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "scripts": {
+    "build": "pnpm -r build",
+    "bootstrap:local": "node --env-file-if-exists=.env.local scripts/bootstrap-local.mjs",
+    "check": "pnpm run format:check && pnpm run typecheck && pnpm run test",
+    "dashboard": "pnpm --filter @human-checkpoint/dashboard start",
+    "agent": "pnpm --filter @human-checkpoint/dashboard agent",
+    "infra:down": "docker compose --project-name human-checkpoint --env-file infra/.env -f infra/compose.yaml down",
+    "infra:logs": "docker compose --project-name human-checkpoint --env-file infra/.env -f infra/compose.yaml logs -f",
+    "infra:up": "docker compose --project-name human-checkpoint --env-file infra/.env -f infra/compose.yaml up -d --wait",
+    "rehearse:before-touch": "node scripts/rehearse-before-touch.mjs",
+    "seed:runtime": "pnpm --filter @human-checkpoint/dashboard seed:runtime",
+    "setup:local": "node scripts/setup-local.mjs",
+    "signer": "node --env-file-if-exists=.env.local node_modules/@themoltnet/signer/dist/main.js",
+    "start:local": "node scripts/start-local.mjs",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "pnpm -r test",
+    "typecheck": "pnpm -r typecheck",
+    "verify-proof": "pnpm --filter @human-checkpoint/core verify-proof"
+  },
+  "devDependencies": {
+    "@themoltnet/signer": "0.2.0",
+    "@types/node": "22.19.0",
+    "prettier": "3.8.3",
+    "typescript": "5.9.2",
+    "vitest": "3.2.4"
+  }
+}

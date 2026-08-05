@@ -1,0 +1,134 @@
+<script type="text/javascript">
+  RED.nodes.registerType('human-checkpoint-agent', {
+    category: 'config',
+    defaults: {
+      name: { value: '' },
+      moltNetUrl: { value: 'https://api.themolt.net', required: true },
+      tokenUrl: { value: '', required: true },
+      clientId: { value: '', required: true },
+      teamId: { value: '', required: true },
+    },
+    credentials: {
+      clientSecret: { type: 'password' },
+      exaApiKey: { type: 'password' },
+    },
+    label: function () {
+      return this.name || 'Human Checkpoint agent';
+    },
+  });
+  for (const type of ['create', 'get']) {
+    RED.nodes.registerType(`human-checkpoint-${type}`, {
+      category: 'Human Checkpoint',
+      color: '#d7ece9',
+      defaults: {
+        name: { value: '' },
+        agent: { value: '', type: 'human-checkpoint-agent', required: true },
+        checkpoint: {
+          value: type === 'create' ? 'research-authorization' : '',
+        },
+        teamId: { value: '' },
+        requestId: { value: '' },
+      },
+      inputs: 1,
+      outputs: 1,
+      icon: 'font-awesome/fa-key',
+      label: function () {
+        return this.name || `human-checkpoint-${type}`;
+      },
+    });
+  }
+  for (const type of ['research', 'release', 'proof', 'verify-proof']) {
+    RED.nodes.registerType(`human-checkpoint-${type}`, {
+      category: 'Human Checkpoint',
+      color: '#d7ece9',
+      defaults: {
+        name: { value: '' },
+        agent: { value: '', type: 'human-checkpoint-agent', required: true },
+      },
+      inputs: 1,
+      outputs: 1,
+      icon: 'font-awesome/fa-shield',
+      label: function () {
+        return this.name || `human-checkpoint-${type}`;
+      },
+    });
+  }
+</script>
+
+<script type="text/html" data-template-name="human-checkpoint-agent">
+  <div class="form-row">
+    <label for="node-config-input-name">Name</label
+    ><input id="node-config-input-name" />
+  </div>
+  <div class="form-row">
+    <label for="node-config-input-moltNetUrl">MoltNet URL</label
+    ><input id="node-config-input-moltNetUrl" />
+  </div>
+  <div class="form-row">
+    <label for="node-config-input-tokenUrl">Token URL</label
+    ><input id="node-config-input-tokenUrl" />
+  </div>
+  <div class="form-row">
+    <label for="node-config-input-clientId">Client ID</label
+    ><input id="node-config-input-clientId" />
+  </div>
+  <div class="form-row">
+    <label for="node-config-input-clientSecret">Client secret</label
+    ><input type="password" id="node-config-input-clientSecret" />
+  </div>
+  <div class="form-row">
+    <label for="node-config-input-exaApiKey">Exa API key</label
+    ><input type="password" id="node-config-input-exaApiKey" />
+  </div>
+  <div class="form-row">
+    <label for="node-config-input-teamId">Team ID</label
+    ><input id="node-config-input-teamId" />
+  </div>
+</script>
+
+<script type="text/html" data-template-name="human-checkpoint-research">
+  <div class="form-row">
+    <label for="node-input-agent">Agent</label><input id="node-input-agent" />
+  </div>
+</script>
+<script type="text/html" data-template-name="human-checkpoint-release">
+  <div class="form-row">
+    <label for="node-input-agent">Agent</label><input id="node-input-agent" />
+  </div>
+</script>
+<script type="text/html" data-template-name="human-checkpoint-proof">
+  <div class="form-row">
+    <label for="node-input-agent">Agent</label><input id="node-input-agent" />
+  </div>
+</script>
+<script
+  type="text/html"
+  data-template-name="human-checkpoint-verify-proof"
+></script>
+
+<script type="text/html" data-template-name="human-checkpoint-create">
+  <div class="form-row">
+    <label for="node-input-agent">Agent</label><input id="node-input-agent" />
+  </div>
+  <div class="form-row">
+    <label for="node-input-checkpoint">Checkpoint</label
+    ><select id="node-input-checkpoint">
+      <option>research-authorization</option>
+      <option>field-release</option>
+    </select>
+  </div>
+  <div class="form-row">
+    <label for="node-input-teamId">Team ID</label
+    ><input id="node-input-teamId" />
+  </div>
+</script>
+
+<script type="text/html" data-template-name="human-checkpoint-get">
+  <div class="form-row">
+    <label for="node-input-agent">Agent</label><input id="node-input-agent" />
+  </div>
+  <div class="form-row">
+    <label for="node-input-requestId">Request ID</label
+    ><input id="node-input-requestId" placeholder="msg.signingRequestId" />
+  </div>
+</script>

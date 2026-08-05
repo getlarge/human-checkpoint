@@ -1,0 +1,30 @@
+{
+  "name": "@human-checkpoint/dashboard",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node src/check-assets.mjs",
+    "prestart": "pnpm --filter @human-checkpoint/node-red build",
+    "start": "node --env-file-if-exists=../../.env.local node_modules/node-red/red.js --userDir . --settings settings.cjs flows/flows.json",
+    "agent": "node --env-file-if-exists=../../.env.local scripts/run-agent.mjs",
+    "generate:flow": "node scripts/generate-flow.mjs",
+    "seed:runtime": "node --env-file-if-exists=../../.env.local scripts/seed-runtime-profile.mjs",
+    "check:runtime": "node --check runtime/human-checkpoint-runtime.mjs && node --check scripts/run-agent.mjs && node --check scripts/seed-runtime-profile.mjs",
+    "test": "vitest run",
+    "typecheck": "node src/check-assets.mjs && tsc -b --emitDeclarationOnly"
+  },
+  "dependencies": {
+    "@human-checkpoint/core": "workspace:*",
+    "@human-checkpoint/node-red": "workspace:*",
+    "@themoltnet/agent-daemon": "0.36.0",
+    "@themoltnet/pi-runtime": "0.6.0",
+    "@themoltnet/sdk": "0.128.0",
+    "node-red": "5.0.1",
+    "typebox": "1.3.6"
+  },
+  "devDependencies": {
+    "@types/node": "22.19.0",
+    "vitest": "3.2.4"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "defaultModel": "gemma4:31b-cloud",
+  "defaultProvider": "ollama-cloud",
+  "enableInstallTelemetry": false,
+  "enabledModels": [
+    "ollama-cloud/gemma4:31b-cloud",
+    "ollama-cloud/nemotron-3-nano:30b-cloud"
+  ],
+  "transport": "sse",
+  "treeFilterMode": "default"
+}

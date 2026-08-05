@@ -1,0 +1,11 @@
+node_modules/
+dist/
+out-tsc/
+.env.local
+.moltnet/
+.pi/auth.json
+.pi/npm/
+.node-red/
+.config.*.json*
+coverage/
+*.log

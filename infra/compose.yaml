@@ -1,0 +1,300 @@
+name: human-checkpoint
+
+services:
+  app-db:
+    image: pgvector/pgvector:pg16
+    ports:
+      - '${MOLTNET_POSTGRES_PORT:-25433}:5432'
+    environment:
+      POSTGRES_USER: moltnet
+      POSTGRES_PASSWORD: moltnet_secret
+      POSTGRES_DB: moltnet
+    volumes:
+      - app-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U moltnet']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  app-db-migrate:
+    image: ${MOLTNET_DB_MIGRATE_IMAGE}
+    platform: linux/amd64
+    environment:
+      DATABASE_URL: postgresql://moltnet:moltnet_secret@app-db:5432/moltnet
+    depends_on:
+      app-db:
+        condition: service_healthy
+    restart: 'on-failure:3'
+
+  kratos-postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: kratos
+      POSTGRES_PASSWORD: kratos_secret
+      POSTGRES_DB: kratosdb
+    volumes:
+      - kratos-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U kratos']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  kratos-migrate:
+    image: oryd/kratos:v25.4.0
+    command: migrate sql -e --yes
+    environment:
+      DSN: postgres://kratos:kratos_secret@kratos-postgres:5432/kratosdb?sslmode=disable
+    depends_on:
+      kratos-postgres:
+        condition: service_healthy
+    restart: 'on-failure:3'
+
+  kratos:
+    image: oryd/kratos:v25.4.0
+    command: serve --config /etc/config/kratos/kratos.yaml --dev --watch-courier
+    ports:
+      - '${MOLTNET_KRATOS_PUBLIC_PORT:-4433}:4433'
+      - '${MOLTNET_KRATOS_ADMIN_PORT:-4434}:4434'
+    environment:
+      DSN: postgres://kratos:kratos_secret@kratos-postgres:5432/kratosdb?sslmode=disable
+      SERVE_PUBLIC_BASE_URL: http://localhost:${MOLTNET_KRATOS_PUBLIC_PORT:-4433}/
+      SELFSERVICE_DEFAULT_BROWSER_RETURN_URL: http://localhost:${HUMAN_CHECKPOINT_NODE_RED_PORT:-1880}/
+      SELFSERVICE_ALLOWED_RETURN_URLS: http://localhost:${HUMAN_CHECKPOINT_NODE_RED_PORT:-1880}/
+      SERVE_PUBLIC_CORS_ALLOWED_ORIGINS: http://localhost:${HUMAN_CHECKPOINT_NODE_RED_PORT:-1880}
+    volumes:
+      - ./ory/kratos/kratos.yaml:/etc/config/kratos/kratos.yaml:ro
+      - ./ory/identity-schema.json:/etc/config/kratos/identity-schema.json:ro
+      - ./ory/human-identity-schema.json:/etc/config/kratos/human-identity-schema.json:ro
+    depends_on:
+      kratos-migrate:
+        condition: service_completed_successfully
+      mailslurper:
+        condition: service_started
+    healthcheck:
+      test:
+        ['CMD', 'wget', '--spider', '-q', 'http://localhost:4433/health/alive']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  kratos-selfservice-ui:
+    image: oryd/kratos-selfservice-ui-node:v25.4.0
+    ports:
+      - '${MOLTNET_KRATOS_UI_PORT:-4455}:4455'
+    environment:
+      PORT: '4455'
+      SECURITY_MODE: standalone
+      KRATOS_PUBLIC_URL: http://kratos:4433/
+      KRATOS_ADMIN_URL: http://kratos:4434/
+      KRATOS_BROWSER_URL: http://localhost:${MOLTNET_KRATOS_PUBLIC_PORT:-4433}/
+      COOKIE_SECRET: local-human-checkpoint-cookie-secret
+      CSRF_COOKIE_NAME: ory_csrf_ui_human_checkpoint
+      CSRF_COOKIE_SECRET: local-human-checkpoint-csrf-secret
+    depends_on:
+      kratos:
+        condition: service_healthy
+
+  hydra-postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: hydra
+      POSTGRES_PASSWORD: hydra_secret
+      POSTGRES_DB: hydradb
+    volumes:
+      - hydra-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U hydra']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  hydra-migrate:
+    image: oryd/hydra:v25.4.0
+    command: migrate sql up -e --yes
+    environment:
+      DSN: postgres://hydra:hydra_secret@hydra-postgres:5432/hydradb?sslmode=disable
+    depends_on:
+      hydra-postgres:
+        condition: service_healthy
+    restart: 'on-failure:3'
+
+  hydra:
+    image: oryd/hydra:v25.4.0
+    command: serve all --config /etc/config/hydra/hydra.yaml --dev
+    ports:
+      - '${MOLTNET_HYDRA_PUBLIC_PORT:-4444}:4444'
+      - '${MOLTNET_HYDRA_ADMIN_PORT:-4445}:4445'
+    environment:
+      DSN: postgres://hydra:hydra_secret@hydra-postgres:5432/hydradb?sslmode=disable
+      SECRETS_SYSTEM: a-very-insecure-secret-for-local-dev-only!!
+      OIDC_SUBJECT_IDENTIFIERS_PAIRWISE_SALT: local-dev-salt-not-for-production
+      URLS_SELF_ISSUER: http://hydra:4444
+      URLS_SELF_PUBLIC: http://localhost:${MOLTNET_HYDRA_PUBLIC_PORT:-4444}/
+    volumes:
+      - ./ory/hydra/hydra.yaml:/etc/config/hydra/hydra.yaml:ro
+    depends_on:
+      hydra-migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        ['CMD', 'wget', '--spider', '-q', 'http://localhost:4444/health/alive']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  keto-postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: keto
+      POSTGRES_PASSWORD: keto_secret
+      POSTGRES_DB: ketodb
+    volumes:
+      - keto-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U keto']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  keto-migrate:
+    image: oryd/keto:v25.4.0
+    command: migrate up --yes --config /etc/config/keto/keto.yaml
+    environment:
+      DSN: postgres://keto:keto_secret@keto-postgres:5432/ketodb?sslmode=disable
+    volumes:
+      - ./ory/keto/keto.yaml:/etc/config/keto/keto.yaml:ro
+      - ./ory/permissions.ts:/etc/config/keto/permissions.ts:ro
+    depends_on:
+      keto-postgres:
+        condition: service_healthy
+    restart: 'on-failure:3'
+
+  keto:
+    image: oryd/keto:v25.4.0
+    command: serve --config /etc/config/keto/keto.yaml
+    ports:
+      - '${MOLTNET_KETO_READ_PORT:-4466}:4466'
+      - '${MOLTNET_KETO_WRITE_PORT:-4467}:4467'
+    environment:
+      DSN: postgres://keto:keto_secret@keto-postgres:5432/ketodb?sslmode=disable
+    volumes:
+      - ./ory/keto/keto.yaml:/etc/config/keto/keto.yaml:ro
+      - ./ory/permissions.ts:/etc/config/keto/permissions.ts:ro
+    depends_on:
+      keto-migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        ['CMD', 'wget', '--spider', '-q', 'http://localhost:4466/health/alive']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  mailslurper:
+    image: oryd/mailslurper:latest-smtps
+    ports:
+      - '${MOLTNET_MAILSLURPER_SMTP_PORT:-21025}:1025'
+      - '${MOLTNET_MAILSLURPER_UI_PORT:-4436}:4436'
+      - '${MOLTNET_MAILSLURPER_SERVICE_PORT:-4437}:4437'
+
+  redis:
+    image: valkey/valkey:8-alpine
+    ports:
+      - '${MOLTNET_REDIS_PORT:-26380}:6379'
+    healthcheck:
+      test: ['CMD', 'valkey-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  runtime-object-store:
+    image: chrislusf/seaweedfs:4.36
+    command:
+      [
+        'server',
+        '-s3',
+        '-s3.port=8333',
+        '-dir=/data',
+        '-master.volumeSizeLimitMB=64',
+        '-volume.max=16',
+      ]
+    environment:
+      AWS_ACCESS_KEY_ID: runtime-sessions
+      AWS_SECRET_ACCESS_KEY: runtime-sessions-secret
+    volumes:
+      - object-store-data:/data
+
+  rest-api:
+    image: ${MOLTNET_REST_API_IMAGE}
+    platform: linux/amd64
+    ports:
+      - '${MOLTNET_API_PORT:-8080}:8080'
+    environment:
+      NODE_ENV: production
+      PORT: '8080'
+      DATABASE_URL: postgresql://moltnet:moltnet_secret@app-db:5432/moltnet
+      DBOS_SYSTEM_DATABASE_URL: postgresql://moltnet:moltnet_secret@app-db:5432/moltnet?schema=dbos
+      ORY_KRATOS_PUBLIC_URL: http://kratos:4433
+      ORY_KRATOS_ADMIN_URL: http://kratos:4434
+      ORY_HYDRA_PUBLIC_URL: http://hydra:4444
+      ORY_HYDRA_ADMIN_URL: http://hydra:4445
+      ORY_KETO_PUBLIC_URL: http://keto:4466
+      ORY_KETO_ADMIN_URL: http://keto:4467
+      ORY_ACTION_API_KEY: local-dev-webhook-key
+      RECOVERY_CHALLENGE_SECRET: local-recovery-secret-for-hmac-signing
+      CORS_ORIGINS: http://localhost:${HUMAN_CHECKPOINT_NODE_RED_PORT:-1880}
+      REDIS_HOST: redis
+      REDIS_PORT: '6379'
+      RUNTIME_SESSION_STORAGE_ENDPOINT: http://runtime-object-store:8333
+      RUNTIME_SESSION_STORAGE_REGION: auto
+      RUNTIME_SESSION_STORAGE_BUCKET: moltnet-runtime-sessions-local
+      RUNTIME_SESSION_STORAGE_ACCESS_KEY_ID: runtime-sessions
+      RUNTIME_SESSION_STORAGE_SECRET_ACCESS_KEY: runtime-sessions-secret
+      RUNTIME_SESSION_STORAGE_FORCE_PATH_STYLE: 'true'
+      RUNTIME_SESSION_MAX_BYTES: '10485760'
+      TASK_ARTIFACT_STORAGE_ENDPOINT: http://runtime-object-store:8333
+      TASK_ARTIFACT_STORAGE_REGION: auto
+      TASK_ARTIFACT_STORAGE_BUCKET: moltnet-task-artifacts-local
+      TASK_ARTIFACT_STORAGE_ACCESS_KEY_ID: runtime-sessions
+      TASK_ARTIFACT_STORAGE_SECRET_ACCESS_KEY: runtime-sessions-secret
+      TASK_ARTIFACT_STORAGE_FORCE_PATH_STYLE: 'true'
+      TASK_ARTIFACT_MAX_BYTES: '26214400'
+    depends_on:
+      app-db:
+        condition: service_healthy
+      app-db-migrate:
+        condition: service_completed_successfully
+      kratos:
+        condition: service_healthy
+      hydra:
+        condition: service_healthy
+      keto:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      runtime-object-store:
+        condition: service_started
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://localhost:8080/health').then(r=>r.ok?process.exit(0):process.exit(1)).catch(()=>process.exit(1))",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 30s
+
+volumes:
+  app-db-data:
+  kratos-db-data:
+  hydra-db-data:
+  keto-db-data:
+  object-store-data:

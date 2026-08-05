@@ -1,0 +1,384 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light" />
+    <title>SR-2048 technician briefing · Human Checkpoint</title>
+    <link rel="stylesheet" href="/dashboard/app.css" />
+    <script type="module" src="/dashboard/app.js"></script>
+  </head>
+  <body data-page="technician-briefing">
+    <a class="skip-link button" href="#main">Skip to service request</a>
+    <header class="service-header">
+      <div class="brand">
+        <strong>Human Checkpoint</strong
+        ><span id="brand-request">Service request</span>
+      </div>
+      <div class="service-status" aria-label="Connection status">
+        <span id="session-status" class="status-mark">Technician session</span>
+        <span id="companion-status" class="status-mark">YubiKey companion</span>
+      </div>
+    </header>
+    <div class="shell">
+      <nav class="journey-nav" aria-label="Work order progress">
+        <h2>Work order progress</h2>
+        <ol>
+          <li>
+            <a id="nav-assigned" aria-current="page" href="/dashboard/requests/"
+              >Assigned request<small id="request-nav-label"
+                >Loading request…</small
+              ></a
+            >
+          </li>
+          <li>
+            <a id="nav-source" href="#research"
+              >Public source check<small>Waiting for your decision</small></a
+            >
+          </li>
+          <li>
+            <a id="nav-release" href="#release"
+              >Work order approval<small>Review and release</small></a
+            >
+          </li>
+        </ol>
+      </nav>
+      <main id="main" tabindex="-1">
+        <div class="page-heading">
+          <h1>Verify the work order before it leaves the field</h1>
+          <p id="page-lead">
+            The assistant can prepare the job, but it must stop for your
+            approval before checking public sources or releasing the work order.
+          </p>
+        </div>
+        <div class="work-layout">
+          <div>
+            <section class="work-order" aria-labelledby="brief-heading">
+              <div class="section-heading">
+                <div>
+                  <h2 id="brief-heading">Technician work-order brief</h2>
+                  <p id="brief-subtitle">
+                    Waiting for the assistant to review the assigned request.
+                  </p>
+                </div>
+                <span id="brief-state" class="state-label">Draft</span>
+              </div>
+              <dl class="record">
+                <dt>Asset</dt>
+                <dd id="brief-asset">Cooling-water circulation pump P-2048</dd>
+                <dt>Observed symptom</dt>
+                <dd id="brief-symptom">
+                  Drive-end vibration increased from 2.1 to 4.8 mm/s RMS
+                </dd>
+                <dt>Current control</dt>
+                <dd>Keep isolated until coupling alignment is checked</dd>
+                <dt>What the assistant can do</dt>
+                <dd>
+                  The agent may reason and draft. It cannot call Exa or release
+                  this order.
+                </dd>
+              </dl>
+              <div class="agent-work" aria-labelledby="agent-work-heading">
+                <h3 id="agent-work-heading">Assistant work</h3>
+                <p>
+                  Each preparation step is a durable MoltNet task. Reloading
+                  this page resumes from the recorded task and approval state.
+                </p>
+                <ol id="task-list">
+                  <li>No assistant task has started.</li>
+                </ol>
+              </div>
+              <div id="findings" hidden>
+                <h3>Validated findings</h3>
+                <ul id="finding-list"></ul>
+                <h3>Public sources</h3>
+                <ul id="source-list" class="source-list"></ul>
+              </div>
+            </section>
+
+            <section
+              id="research"
+              class="work-order"
+              aria-labelledby="research-heading"
+            >
+              <div class="section-heading">
+                <div>
+                  <h2 id="research-heading">
+                    Approve a check of public sources
+                  </h2>
+                  <p>
+                    The assistant wants to check four results from the listed
+                    manufacturer and maintenance sources.
+                  </p>
+                </div>
+                <span id="research-state" class="state-label"
+                  >Not requested</span
+                >
+              </div>
+              <div
+                id="research-notice"
+                class="notice hardware"
+                role="status"
+                aria-live="polite"
+              >
+                <p>
+                  The assistant is waiting for your approval before it contacts
+                  a public search service.
+                </p>
+              </div>
+              <dl class="record">
+                <dt>What it will check</dt>
+                <dd id="research-queries">
+                  The assistant will propose public-equipment queries from the
+                  assigned request.
+                </dd>
+                <dt>Where it can look</dt>
+                <dd id="research-domains">
+                  SKF, Fluke, and the Hydraulic Institute
+                </dd>
+                <dt>Result limit</dt>
+                <dd id="research-limit">4</dd>
+                <dt>Approval expires</dt>
+                <dd id="research-expiry">
+                  Set when the approval request is prepared
+                </dd>
+                <dt>Request ID</dt>
+                <dd id="research-request-id" class="mono">—</dd>
+              </dl>
+              <div class="actions">
+                <button id="prepare-research" type="button">
+                  Prepare source check for review
+                </button>
+                <button
+                  id="sign-research"
+                  class="evidence"
+                  type="button"
+                  disabled
+                >
+                  Touch YubiKey to approve
+                </button>
+                <button id="run-research" type="button" disabled>
+                  Continue preparing the brief
+                </button>
+                <button
+                  id="refresh-research"
+                  class="secondary"
+                  type="button"
+                  disabled
+                >
+                  Check approval status
+                </button>
+              </div>
+              <details>
+                <summary>Technical verification details</summary>
+                <pre id="research-message">No approval request prepared.</pre>
+                <pre id="research-key">
+The request-specific public key appears after approval.</pre
+                >
+              </details>
+            </section>
+
+            <section
+              id="release"
+              class="work-order"
+              aria-labelledby="release-heading"
+            >
+              <div class="section-heading">
+                <div>
+                  <h2 id="release-heading">
+                    Review and approve this work order
+                  </h2>
+                  <p>
+                    Your field note and the assistant’s completed brief will be
+                    locked together in the approval record.
+                  </p>
+                </div>
+                <span id="release-state" class="state-label"
+                  >Not requested</span
+                >
+              </div>
+              <div class="field">
+                <label for="field-amendment"
+                  >Field amendment <span aria-hidden="true">*</span></label
+                >
+                <textarea
+                  id="field-amendment"
+                  required
+                  aria-describedby="amendment-hint"
+                >
+Install a temporary exclusion marker at the south access point before restart.</textarea
+                >
+                <span id="amendment-hint" class="hint"
+                  >Required. Once you prepare the approval, changing this note
+                  requires a new approval request.</span
+                >
+              </div>
+              <div class="field">
+                <label for="technician-role">Technician role</label>
+                <input id="technician-role" value="Lead field technician" />
+              </div>
+              <div class="field">
+                <label for="shift">Shift</label>
+                <select id="shift">
+                  <option>Day / A</option>
+                  <option>Night / B</option>
+                </select>
+              </div>
+              <dl class="record">
+                <dt>Outcome</dt>
+                <dd>Approve with field note</dd>
+                <dt>Request ID</dt>
+                <dd id="release-request-id" class="mono">—</dd>
+                <dt>Approval expires</dt>
+                <dd id="release-expiry">
+                  Set when the approval request is prepared
+                </dd>
+              </dl>
+              <div class="actions">
+                <button id="prepare-release" type="button" disabled>
+                  Review final approval
+                </button>
+                <button
+                  id="sign-release"
+                  class="evidence"
+                  type="button"
+                  disabled
+                >
+                  Touch YubiKey to approve work order
+                </button>
+                <button id="finalize-release" type="button" disabled>
+                  Release approved work order
+                </button>
+                <button
+                  id="refresh-release"
+                  class="secondary"
+                  type="button"
+                  disabled
+                >
+                  Check approval status
+                </button>
+              </div>
+              <details>
+                <summary>Technical verification details</summary>
+                <pre id="release-message">No approval request prepared.</pre>
+                <pre id="release-key">
+The request-specific public key appears after approval.</pre
+                >
+              </details>
+            </section>
+
+            <section class="work-order" aria-labelledby="proof-heading">
+              <div class="section-heading">
+                <div>
+                  <h2 id="proof-heading">Approval record</h2>
+                  <p>
+                    Download a record that can be checked without MoltNet or the
+                    YubiKey.
+                  </p>
+                </div>
+                <span id="proof-state" class="state-label">Unavailable</span>
+              </div>
+              <div
+                id="proof-notice"
+                class="notice"
+                role="status"
+                aria-live="polite"
+              >
+                <p>
+                  Approve the public source check and the work order before
+                  downloading the record.
+                </p>
+              </div>
+              <div class="actions">
+                <button id="export-proof" type="button" disabled>
+                  Download approval record
+                </button>
+                <button
+                  id="verify-proof"
+                  class="secondary"
+                  type="button"
+                  disabled
+                >
+                  Check downloaded record
+                </button>
+                <button
+                  id="tamper-proof"
+                  class="evidence"
+                  type="button"
+                  disabled
+                >
+                  Show tamper detection
+                </button>
+              </div>
+              <details>
+                <summary>Verification report</summary>
+                <pre id="verification-report">No proof loaded.</pre>
+              </details>
+            </section>
+          </div>
+
+          <aside
+            class="work-order evidence-rail"
+            aria-labelledby="custody-heading"
+          >
+            <div class="section-heading">
+              <div>
+                <h2 id="custody-heading">Work order progress</h2>
+                <p>What is happening now and what needs you.</p>
+              </div>
+            </div>
+            <ol class="custody">
+              <li id="trace-draft">
+                <div>
+                  <strong>Assistant reviews request</strong
+                  ><small>Uses assigned request and approved history</small>
+                </div>
+              </li>
+              <li id="trace-research">
+                <div>
+                  <strong>Public source check approved</strong
+                  ><small>Allows only the sources shown</small>
+                </div>
+              </li>
+              <li id="trace-brief">
+                <div>
+                  <strong>Brief validated</strong
+                  ><small>Source findings are locked</small>
+                </div>
+              </li>
+              <li id="trace-release">
+                <div>
+                  <strong>Work order approved</strong
+                  ><small>Locks the brief and field note</small>
+                </div>
+              </li>
+              <li id="trace-proof">
+                <div>
+                  <strong>Approval record checked</strong
+                  ><small>Both decisions verify offline</small>
+                </div>
+              </li>
+            </ol>
+            <div id="key-comparison" class="notice hardware">
+              <p>The two approvals will use separate request-specific keys.</p>
+            </div>
+            <details>
+              <summary>About the approval record</summary>
+              <p>
+                The record may retain claimant and credential identifiers. It
+                proves approval of the exact content shown; it is not anonymous.
+              </p>
+            </details>
+          </aside>
+        </div>
+        <div
+          id="global-status"
+          class="notice"
+          role="alert"
+          aria-live="assertive"
+          hidden
+        ></div>
+      </main>
+    </div>
+  </body>
+</html>

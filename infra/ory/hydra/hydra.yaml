@@ -1,0 +1,74 @@
+version: v2.3.0
+
+dsn: postgres://hydra:hydra_secret@hydra-postgres:5432/hydradb?sslmode=disable
+
+serve:
+  public:
+    cors:
+      enabled: true
+      allowed_origins: [http://localhost:1880]
+      allowed_methods: [POST, GET, PUT, PATCH, DELETE, OPTIONS]
+      allowed_headers: [Authorization, Content-Type, X-Requested-With]
+      exposed_headers: [Content-Type]
+      allow_credentials: true
+      max_age: 86400
+
+urls:
+  self:
+    issuer: http://hydra:4444/
+    public: http://localhost:4444/
+  consent: http://localhost:1880/dashboard/auth/consent
+  login: http://localhost:4455/login
+  logout: http://localhost:4455/logout
+  error: http://localhost:1880/dashboard/hardware-setup/
+  post_logout_redirect: http://localhost:1880/dashboard/hardware-setup/
+
+strategies:
+  access_token: jwt
+
+oauth2:
+  expose_internal_errors: true
+  grant:
+    jwt:
+      iat_optional: false
+      jti_optional: false
+      max_ttl: 720h
+  client_credentials:
+    default_grant_allowed_scope: true
+  session:
+    encrypt_at_rest: true
+  pkce:
+    enforced: false
+    enforced_for_public_clients: true
+  token_hook:
+    url: http://rest-api:8080/hooks/hydra/token-exchange
+    auth:
+      type: api_key
+      config:
+        in: header
+        name: X-Ory-Api-Key
+        value: local-dev-webhook-key
+
+oidc:
+  subject_identifiers:
+    supported_types: [public]
+    pairwise:
+      salt: local-dev-salt-not-for-production
+  dynamic_client_registration:
+    enabled: true
+    default_scope:
+      [
+        diary:read,
+        diary:write,
+        crypto:sign,
+        agent:profile,
+        human:profile,
+        team:read,
+      ]
+
+ttl:
+  access_token: 1h
+  refresh_token: 720h
+  id_token: 1h
+  auth_code: 10m
+  login_consent_request: 30m
