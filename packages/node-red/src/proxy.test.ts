@@ -100,4 +100,18 @@ describe('same-origin signing proxy', () => {
       }),
     ).toMatchObject({ status: 401 });
   });
+
+  it('rejects an empty JSON mutation before contacting MoltNet', async () => {
+    const { handler, fetch } = proxy();
+    const result = await handler({
+      method: 'POST',
+      url: '/dashboard/api/signing/crypto/signing-credentials/registrations',
+      headers: {
+        origin: 'https://checkpoint.example',
+        'content-type': 'application/json',
+      },
+    });
+    expect(result).toMatchObject({ status: 400 });
+    expect(fetch).not.toHaveBeenCalled();
+  });
 });

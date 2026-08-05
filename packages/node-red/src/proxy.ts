@@ -1,5 +1,5 @@
 const PREFIX = '/dashboard/api/signing';
-const MAX_BODY_BYTES = 64 * 1024;
+export const MAX_SIGNING_BODY_BYTES = 64 * 1024;
 
 const ROUTES: ReadonlyArray<{ method: string; pattern: RegExp }> = [
   { method: 'GET', pattern: /^\/crypto\/signing-credentials(?:\?[^#]*)?$/ },
@@ -75,8 +75,12 @@ export function createSigningProxy(options: SigningProxyOptions) {
         }
         const length = request.body?.byteLength ?? 0;
         const declared = Number(request.headers['content-length'] ?? length);
-        if (length > MAX_BODY_BYTES || declared > MAX_BODY_BYTES)
+        if (
+          length > MAX_SIGNING_BODY_BYTES ||
+          declared > MAX_SIGNING_BODY_BYTES
+        )
           return response(413, 'body_too_large', headers);
+        if (length === 0) return response(400, 'body_required', headers);
       }
       const token = await options.getAccessToken(request.headers.cookie);
       if (!token) return response(401, 'sign_in_required', headers);

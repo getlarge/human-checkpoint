@@ -26,9 +26,20 @@ const dashboardOrigin = 'http://localhost:1880';
 
 await requireHealthy(`${apiUrl}/health`);
 
+const schemas = await requestJson(`${kratosAdminUrl}/schemas`);
+const agentSchema = schemas.find((schema) =>
+  schema.schema?.$id?.includes('agent'),
+);
+const humanSchema = schemas.find((schema) =>
+  schema.schema?.$id?.includes('human'),
+);
+if (!agentSchema || !humanSchema) {
+  throw new Error('Local Kratos is missing the MoltNet identity schemas.');
+}
+
 if (existsSync(identityPath) && existsSync(dashboardPath)) {
   const identity = JSON.parse(readFileSync(identityPath, 'utf8'));
-  const dashboard = JSON.parse(readFileSync(dashboardPath, 'utf8'));
+  let dashboard = JSON.parse(readFileSync(dashboardPath, 'utf8'));
   if (
     !identity.oauth2?.client_id ||
     !identity.oauth2?.client_secret ||
@@ -40,20 +51,10 @@ if (existsSync(identityPath) && existsSync(dashboardPath)) {
       'Existing local credentials are incomplete. Run pnpm run infra:down with volumes removed, then remove .moltnet and retry.',
     );
   }
+  dashboard = await ensureCredentialManager(dashboard, humanSchema.id);
   writeApplicationEnv({ identity, dashboard });
   printSummary(identity, dashboard, true);
   process.exit(0);
-}
-
-const schemas = await requestJson(`${kratosAdminUrl}/schemas`);
-const agentSchema = schemas.find((schema) =>
-  schema.schema?.$id?.includes('agent'),
-);
-const humanSchema = schemas.find((schema) =>
-  schema.schema?.$id?.includes('human'),
-);
-if (!agentSchema || !humanSchema) {
-  throw new Error('Local Kratos is missing the MoltNet identity schemas.');
 }
 
 const keyPair = makeKeyPair();
@@ -89,6 +90,24 @@ const technician = await requestJson(`${kratosAdminUrl}/admin/identities`, {
     },
   }),
 });
+const credentialManagerPassword = `hc-manager-${randomBytes(18).toString('base64url')}`;
+const credentialManager = await requestJson(
+  `${kratosAdminUrl}/admin/identities`,
+  {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      schema_id: humanSchema.id,
+      traits: {
+        email: 'credential-manager@human-checkpoint.demo.invalid',
+        username: 'credential-manager',
+      },
+      credentials: {
+        password: { config: { password: credentialManagerPassword } },
+      },
+    }),
+  },
+);
 
 const teamId = randomUUID();
 const diaryId = randomUUID();
@@ -96,6 +115,9 @@ runSql(
   `INSERT INTO agents (identity_id, public_key, fingerprint) VALUES (${sql(identity.id)}, ${sql(keyPair.publicKey)}, ${sql(keyPair.fingerprint)});`,
 );
 runSql(`INSERT INTO humans (identity_id) VALUES (${sql(technician.id)});`);
+runSql(
+  `INSERT INTO humans (identity_id) VALUES (${sql(credentialManager.id)});`,
+);
 runSql(
   `INSERT INTO teams (id, name, status, personal, creator_agent_id) VALUES (${sql(teamId)}, 'Human Checkpoint Field Service', 'active', false, ${sql(identity.id)});`,
 );
@@ -116,12 +138,28 @@ await putRelation({
   subject_id: technician.id,
 });
 await putRelation({
+  namespace: 'Human',
+  object: credentialManager.id,
+  relation: 'self',
+  subject_id: credentialManager.id,
+});
+await putRelation({
   namespace: 'Team',
   object: teamId,
   relation: 'owners',
   subject_set: {
     namespace: 'Agent',
     object: identity.id,
+    relation: '',
+  },
+});
+await putRelation({
+  namespace: 'Team',
+  object: teamId,
+  relation: 'owners',
+  subject_set: {
+    namespace: 'Human',
+    object: credentialManager.id,
     relation: '',
   },
 });
@@ -203,6 +241,12 @@ const dashboard = {
     username: 'field-technician',
     email: 'technician@human-checkpoint.demo.invalid',
     password: technicianPassword,
+  },
+  credentialManager: {
+    id: credentialManager.id,
+    username: 'credential-manager',
+    email: 'credential-manager@human-checkpoint.demo.invalid',
+    password: credentialManagerPassword,
   },
 };
 writeFileSync(dashboardPath, `${JSON.stringify(dashboard, null, 2)}\n`, {
@@ -335,6 +379,8 @@ function writeApplicationEnv({ identity, dashboard }) {
     HUMAN_CHECKPOINT_HUMAN_AUTHORIZE_URL: `${hydraPublicUrl}/oauth2/auth`,
     HUMAN_CHECKPOINT_HUMAN_TOKEN_URL: `${hydraPublicUrl}/oauth2/token`,
     HUMAN_CHECKPOINT_HUMAN_USERINFO_URL: `${hydraPublicUrl}/userinfo`,
+    HUMAN_CHECKPOINT_HUMAN_LOGOUT_URL:
+      'http://localhost:4433/self-service/logout/browser?return_to=http%3A%2F%2Flocalhost%3A1880%2Fdashboard%2Fhardware-setup%2F',
     HUMAN_CHECKPOINT_HUMAN_CLIENT_ID: dashboard.clientId,
     HUMAN_CHECKPOINT_HUMAN_CLIENT_SECRET: dashboard.clientSecret,
     HUMAN_CHECKPOINT_COOKIE_SECRET:
@@ -476,6 +522,58 @@ async function requestJson(url, init = {}) {
   return body;
 }
 
+async function ensureCredentialManager(dashboard, humanSchemaId) {
+  if (
+    dashboard.credentialManager?.id &&
+    dashboard.credentialManager?.password
+  ) {
+    return dashboard;
+  }
+  const password = `hc-manager-${randomBytes(18).toString('base64url')}`;
+  const manager = await requestJson(`${kratosAdminUrl}/admin/identities`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      schema_id: humanSchemaId,
+      traits: {
+        email: 'credential-manager@human-checkpoint.demo.invalid',
+        username: 'credential-manager',
+      },
+      credentials: { password: { config: { password } } },
+    }),
+  });
+  runSql(`INSERT INTO humans (identity_id) VALUES (${sql(manager.id)});`);
+  await putRelation({
+    namespace: 'Human',
+    object: manager.id,
+    relation: 'self',
+    subject_id: manager.id,
+  });
+  await putRelation({
+    namespace: 'Team',
+    object: dashboard.teamId,
+    relation: 'owners',
+    subject_set: {
+      namespace: 'Human',
+      object: manager.id,
+      relation: '',
+    },
+  });
+  const nextDashboard = {
+    ...dashboard,
+    credentialManager: {
+      id: manager.id,
+      username: 'credential-manager',
+      email: 'credential-manager@human-checkpoint.demo.invalid',
+      password,
+    },
+  };
+  writeFileSync(dashboardPath, `${JSON.stringify(nextDashboard, null, 2)}\n`, {
+    mode: 0o600,
+  });
+  return nextDashboard;
+}
+
 function printSummary(identity, dashboard, reused) {
   process.stdout.write(
     `${JSON.stringify(
@@ -486,6 +584,8 @@ function printSummary(identity, dashboard, reused) {
         teamId: dashboard.teamId,
         technicianIdentityId: dashboard.technician.id,
         technicianUsername: dashboard.technician.username,
+        credentialManagerIdentityId: dashboard.credentialManager?.id,
+        credentialManagerUsername: dashboard.credentialManager?.username,
         technicianCredentials: dashboardPath,
         environment: envPath,
       },

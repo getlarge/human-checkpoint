@@ -1,7 +1,7 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { join } from 'node:path';
 
-import { createSigningProxy } from './proxy.js';
+import { createSigningProxy, MAX_SIGNING_BODY_BYTES } from './proxy.js';
 import {
   clearSessionCookie,
   cookieValue,
@@ -20,6 +20,7 @@ interface RequestLike {
   body?: unknown;
   query: Record<string, unknown>;
   params?: Record<string, string>;
+  [Symbol.asyncIterator]?(): AsyncIterator<unknown>;
 }
 interface ResponseLike {
   status(code: number): ResponseLike;
@@ -329,6 +330,7 @@ export function installHttpRoutesFromEnvironment(RED: RedWithHttp): void {
       state,
       code_challenge: challenge,
       code_challenge_method: 'S256',
+      prompt: 'login',
     }).toString();
     response.redirect(authorize.toString());
   });
@@ -404,14 +406,14 @@ export function installHttpRoutesFromEnvironment(RED: RedWithHttp): void {
 
   RED.httpNode.get('/dashboard/auth/logout', (_request, response) => {
     response.setHeader('set-cookie', clearSessionCookie(secure));
-    response.redirect('/dashboard/hardware-setup/');
+    response.redirect(humanLogoutTarget(env.HUMAN_CHECKPOINT_HUMAN_LOGOUT_URL));
   });
 
   RED.httpNode.all('/dashboard/api/signing/*', async (request, response) => {
-    const raw =
-      request.body === undefined
-        ? undefined
-        : Buffer.from(JSON.stringify(request.body));
+    const streamed = await readSigningRequestBody(request);
+    const raw = streamed.tooLarge
+      ? Buffer.alloc(MAX_SIGNING_BODY_BYTES + 1)
+      : streamed.body;
     const proxied = await proxy({
       method: request.method,
       url: request.originalUrl,
@@ -428,6 +430,45 @@ export function installHttpRoutesFromEnvironment(RED: RedWithHttp): void {
       response.setHeader(name, value);
     response.send(proxied.body);
   });
+}
+
+export async function readSigningRequestBody(
+  request: Pick<RequestLike, 'body' | 'method'> &
+    Partial<AsyncIterable<unknown>>,
+): Promise<{ body?: Buffer; tooLarge: boolean }> {
+  if (request.body !== undefined) {
+    const body = encodeRequestBody(request.body);
+    return {
+      ...(body.byteLength <= MAX_SIGNING_BODY_BYTES ? { body } : {}),
+      tooLarge: body.byteLength > MAX_SIGNING_BODY_BYTES,
+    };
+  }
+  if (
+    request.method === 'GET' ||
+    typeof request[Symbol.asyncIterator] !== 'function'
+  ) {
+    return { tooLarge: false };
+  }
+  const chunks: Buffer[] = [];
+  let length = 0;
+  let tooLarge = false;
+  for await (const chunk of request as AsyncIterable<unknown>) {
+    const bytes = encodeRequestBody(chunk);
+    length += bytes.byteLength;
+    if (length <= MAX_SIGNING_BODY_BYTES) chunks.push(bytes);
+    else tooLarge = true;
+  }
+  return {
+    ...(tooLarge ? {} : { body: Buffer.concat(chunks, length) }),
+    tooLarge,
+  };
+}
+
+function encodeRequestBody(value: unknown): Buffer {
+  if (Buffer.isBuffer(value)) return value;
+  if (value instanceof Uint8Array) return Buffer.from(value);
+  if (typeof value === 'string') return Buffer.from(value);
+  return Buffer.from(JSON.stringify(value) ?? '');
 }
 
 function header(request: RequestLike, name: string): string | undefined {
@@ -447,6 +488,10 @@ function isLoopbackUrl(value: string): boolean {
   } catch {
     return false;
   }
+}
+
+export function humanLogoutTarget(value: string | undefined): string {
+  return value && isLoopbackUrl(value) ? value : '/dashboard/hardware-setup/';
 }
 
 function safeReturnTo(value: string | undefined): string {
