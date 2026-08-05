@@ -10,8 +10,11 @@ loopback signer-companion approval page opens outside the dashboard.
 3. “Enroll YubiKey” opens the enrollment ceremony and hardware touch.
 4. The dashboard begins MoltNet registration and sends its challenge to the
    companion for the registration touch.
-5. MoltNet creates a pending credential; the seeded team owner activates it.
-6. Ready state shows the credential metadata and route to `SR-2048`.
+5. MoltNet creates a pending credential. The technician signs out and the
+   seeded credential manager signs in to activate it; MoltNet does not permit
+   credential owners to approve their own credential.
+6. The field technician signs back in. Ready state shows the credential
+   metadata and route to `SR-2048`.
 
 Unavailable companion, missing or multiple keys, cancelled touch, expired
 registration, permission denial, and revoked credential remain recoverable.
@@ -37,15 +40,15 @@ wrong-method, invalid, or non-canonical approval remains blocked.
 
 ## Journey 2 — Release the verified work order
 
-1. The technician adds the required append-only field amendment.
-2. The work-order approval binds the brief, amendment, fixed disposition,
+1. The technician adds the required append-only field note.
+2. The work-order approval binds the brief, field note, fixed disposition,
    team, role, and shift.
 3. Bound editing locks; a change requires a fresh request.
 4. The same enrolled YubiKey claims and signs the work-order decision.
 5. Node-RED re-fetches and re-canonicalizes it before finalization.
 6. The page shows both valid signatures and different derived public keys.
 7. The technician exports `human-checkpoint-proof:v1` and verifies it offline.
-8. A one-character amendment mutation in a copy makes verification fail.
+8. A one-character field-note mutation in a copy makes verification fail.
 
 ## Restart recovery
 

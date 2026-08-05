@@ -10,8 +10,10 @@ Organizer deadline shown in the form: **August 6 at 9:00 am PT**.
 - First and last name: `TODO`
 - Email address: `TODO`
 - Project name: `Human Checkpoint`
-- Source code: `TODO: immutable public repository tree URL`
-- Documentation: `TODO: immutable README URL` and `TODO: public demo video`
+- Source code: <https://github.com/getlarge/human-checkpoint/tree/v0.1.0>
+- Documentation:
+  <https://github.com/getlarge/human-checkpoint/blob/v0.1.0/README.md> and
+  `TODO: public demo video`
 - What did you learn from your project?: use the paste-ready answer below.
 
 ## Title
@@ -30,9 +32,11 @@ bundle.
 
 ## Links
 
-- Repository permalink: `TODO: final immutable GitHub tree URL`
+- Repository permalink:
+  <https://github.com/getlarge/human-checkpoint/tree/v0.1.0>
 - Demo video: `TODO`
-- Tagged source archive: `TODO`
+- Tagged source archive:
+  <https://github.com/getlarge/human-checkpoint/archive/refs/tags/v0.1.0.zip>
 
 ## Learnings
 
@@ -69,9 +73,9 @@ Complete these after the rated submission fields:
 - [ ] Submit before August 6 at 9:00 am PT.
 - [ ] Immutable repository and tagged archive links work while signed out.
 - [ ] Public video is under three minutes and works while signed out.
-- [ ] One physical YubiKey approves the public-source check and work order.
-- [ ] Different derived public keys are visible.
-- [ ] Offline proof succeeds; one-character amendment tamper fails.
+- [x] One physical YubiKey approves the public-source check and work order.
+- [x] Different derived public keys are visible.
+- [x] Offline proof succeeds; one-character field-note tamper fails.
 - [ ] Clean-checkout README rehearsal succeeds.
 - [ ] Fallback screenshots are captured.
 - [ ] This is the newest and final submission entry.

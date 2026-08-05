@@ -26,7 +26,7 @@ one-character change.
 - A plain-language summary of the proposed public-source check before touch.
 - A generated pre-visit brief that distinguishes prior outcomes from the
   current machine's still-unknown condition.
-- A required append-only field amendment before final approval.
+- A required append-only field note before final approval.
 - A downloadable approval record, offline verification, and a safe tamper
   demonstration.
 
@@ -106,7 +106,7 @@ used directly by the Node-RED package; nothing is published during the demo.
   checkpoint identity, and policy expiry. Returned URLs must also be HTTPS and
   within the approved domains.
 - Final release re-fetches the completed request and re-validates the exact
-  brief, field amendment, role, shift, team, purpose, method, and signature.
+  brief, field note, role, shift, team, purpose, method, and signature.
 - Offline verification checks both ESP256 signatures, request-scoped public
   keys, canonical messages, digests, metadata consistency, and aggregate proof
   hash.
@@ -132,10 +132,10 @@ Pinned application dependencies include Node-RED 5.0.1,
 ## Local setup
 
 The local setup is self-contained in this repository. It starts pinned
-MoltNet, Ory, Postgres, Redis, and object-store services; creates one agent and
-one human technician; creates their team and private diary; registers separate
-agent and dashboard OAuth clients; creates the enforce-mode runtime profile;
-and seeds the support-request queue.
+MoltNet, Ory, Postgres, Redis, and object-store services; creates one agent, one
+field technician, and one credential manager; creates their team and private
+diary; registers separate agent and dashboard OAuth clients; creates the
+enforce-mode runtime profile; and seeds the support-request queue.
 
 1. Install dependencies and provide the two external-service keys:
 
@@ -152,8 +152,9 @@ and seeds the support-request queue.
    ```
 
    Generated secrets stay in ignored `.env.local` and
-   `.moltnet/human-checkpoint-field-agent/`. The technician username and
-   password are stored with mode `0600` in `dashboard.json` there.
+   `.moltnet/human-checkpoint-field-agent/`. The technician and credential
+   manager usernames and passwords are stored with mode `0600` in
+   `dashboard.json` there.
 
 3. Start the dashboard, real task worker, and signer companion together:
 
@@ -161,8 +162,11 @@ and seeds the support-request queue.
    pnpm run start:local
    ```
 
-4. Open `http://localhost:1880/`. After sign-in, it routes to the assigned
-   request queue. Enroll the YubiKey from “YubiKey setup”, then open `SR-2048`.
+4. Open `http://localhost:1880/`. Sign in as the field technician and enroll
+   the YubiKey from “YubiKey setup”. Sign out and sign in once as the seeded
+   credential manager to activate it. Return to the field technician account
+   before opening `SR-2048`. MoltNet deliberately prevents the credential
+   owner from self-approving this activation.
 
 `pnpm run infra:down` stops the local containers without removing their
 volumes. `pnpm run setup:local` is idempotent and reuses the generated
@@ -213,9 +217,10 @@ YubiKey ceremony with mocked evidence in a submitted demo.
 
 - previewSign is a Yubico firmware-preview extension, not generic WebAuthn or
   PIV signing. Firmware 5.8 alone does not prove that a key supports it.
-- The seeded technician activates their own credential for demo speed.
-  Production deployments should separate enrollment, credential management,
-  and release authority where policy requires it.
+- The local seed includes a second human credential manager because MoltNet
+  enforces separation between credential ownership and activation. The two
+  work decisions still belong to the field technician and use the same
+  physical YubiKey.
 - SQLite is appropriate for this single-server demonstration. Multi-instance
   production orchestration would need coordinated storage and leasing.
 - MoltNet, the model provider, Exa, and the signer ceremony require their
@@ -241,8 +246,9 @@ YubiKey ceremony with mocked evidence in a submitted demo.
 - Submission form:
   <https://docs.google.com/forms/d/e/1FAIpQLSfaczYBBIYY9p3nJDQCmFmpZ0s8cHuhCbV8QP8I-mw5aOYI6A/viewform>
 - Demo video: `TODO: final public URL`
-- Permanent source: `TODO: https://github.com/getlarge/human-checkpoint/tree/<final-sha>`
-- Tagged source archive: `TODO: final GitHub archive URL`
+- Permanent source: <https://github.com/getlarge/human-checkpoint/tree/v0.1.0>
+- Tagged source archive:
+  <https://github.com/getlarge/human-checkpoint/archive/refs/tags/v0.1.0.zip>
 
 ## License
 

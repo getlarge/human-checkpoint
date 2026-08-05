@@ -39,7 +39,8 @@ Tagline: **The agent can ask. Only a human can answer.**
 
 ## Operating Context
 
-- One enrolled YubiKey and a seeded technician acting as demo team owner.
+- One enrolled YubiKey, one field technician who owns and uses it, and one
+  seeded credential manager for the one-time activation approval.
 - An authenticated queue at `/dashboard/requests`, YubiKey setup, and an
   assigned-request workspace.
 - A loopback signer companion for explicit confirmation and hardware touch.
@@ -52,7 +53,7 @@ Tagline: **The agent can ask. Only a human can answer.**
 
 - The public-source decision binds the exact queries, domains, result limit,
   reason, team, and expiry. The work-order decision binds the immutable brief,
-  append-only field amendment, fixed disposition, team, role, and shift.
+  append-only field note, fixed disposition, team, role, and shift.
 - OAuth material remains in HttpOnly cookies or Node-RED credentials. Browser
   calls to the companion use `credentials: omit`.
 - Canonical JSON sorts keys by UTF-8 bytes and rejects ambiguous values,
@@ -77,10 +78,11 @@ Tagline: **The agent can ask. Only a human can answer.**
 ## Evidence on Hand
 
 MoltNet implements delegated human signing, previewSign credential lifecycle,
-ARKG-P256 derivation, ESP256 verification, and the signer companion. Its
-packaged real-device beta gate passed with compatible YubiKey 5.8 previewSign
-hardware on 2026-07-27. This repository does not contain a captured hardware
-proof until an operator completes the acceptance procedure.
+ARKG-P256 derivation, ESP256 verification, and the signer companion. On
+2026-08-05, the standalone demo completed enrollment, independent credential
+activation, both technician decisions on the same YubiKey 5.8, approved-source
+task execution, offline verification, and a one-character tamper failure. The
+generated evidence stays in ignored local state and is not committed.
 
 No customer, deployment-scale, certification, or production-outcome claims are
 available and none may be invented.
