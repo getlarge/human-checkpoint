@@ -1,0 +1,1535 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Human Checkpoint — hardware-bound approvals for AI agents</title>
+    <meta
+      name="description"
+      content="An AI agent prepares field-service work but cannot act alone. A technician approves each consequential step with a YubiKey 5.8. Verify the real signatures in your browser."
+    />
+    <style>
+      :root {
+        --canvas: #f3f6f5;
+        --paper: #ffffff;
+        --paper-muted: #e9efed;
+        --ink: #14211f;
+        --ink-muted: #536763;
+        --rule: #c9d5d2;
+        --teal: #087f78;
+        --teal-strong: #05645f;
+        --amber: #b86d08;
+        --amber-muted: #fff1d6;
+        --success: #277a4c;
+        --danger: #b43a3a;
+        --control: 6px;
+        --panel: 10px;
+        --sans: 'Avenir Next', Avenir, 'Segoe UI', sans-serif;
+        --mono:
+          ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--canvas);
+        color: var(--ink);
+        font-family: var(--sans);
+        font-size: 16px;
+        line-height: 1.55;
+      }
+      .wrap {
+        max-width: 940px;
+        margin: 0 auto;
+        padding: 0 24px;
+      }
+      h1,
+      h2,
+      h3 {
+        line-height: 1.15;
+        letter-spacing: -0.02em;
+        margin: 0 0 12px;
+      }
+      h1 {
+        font-size: 2.25rem;
+        font-weight: 700;
+      }
+      h2 {
+        font-size: 1.5rem;
+        font-weight: 700;
+      }
+      h3 {
+        font-size: 1.0625rem;
+        font-weight: 700;
+      }
+      p {
+        margin: 0 0 16px;
+      }
+      a {
+        color: var(--teal-strong);
+      }
+      code,
+      .mono {
+        font-family: var(--mono);
+        font-size: 0.8125rem;
+      }
+      header.site {
+        border-bottom: 1px solid var(--rule);
+        background: var(--paper);
+      }
+      header.site .wrap {
+        padding-top: 14px;
+        padding-bottom: 14px;
+        display: flex;
+        gap: 16px;
+        align-items: baseline;
+        flex-wrap: wrap;
+      }
+      .brand {
+        font-weight: 700;
+        letter-spacing: -0.02em;
+      }
+      .brand span {
+        color: var(--ink-muted);
+        font-weight: 400;
+      }
+      nav.site {
+        margin-left: auto;
+        display: flex;
+        gap: 16px;
+        flex-wrap: wrap;
+        font-size: 0.875rem;
+      }
+      .hero {
+        padding: 56px 0 40px;
+      }
+      .kicker {
+        font-size: 0.75rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--ink-muted);
+        font-weight: 600;
+        margin-bottom: 10px;
+      }
+      .lede {
+        font-size: 1.125rem;
+        max-width: 62ch;
+      }
+      blockquote.tag {
+        margin: 0 0 24px;
+        padding-left: 16px;
+        border-left: 3px solid var(--amber);
+        font-size: 1.125rem;
+        color: var(--ink);
+      }
+      section {
+        padding: 40px 0;
+        border-top: 1px solid var(--rule);
+      }
+      .panel {
+        background: var(--paper);
+        border: 1px solid var(--rule);
+        border-radius: var(--panel);
+        padding: 24px;
+      }
+      .grid2 {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+      }
+      button {
+        font-family: inherit;
+        font-size: 0.9375rem;
+        border-radius: var(--control);
+        border: 1px solid var(--rule);
+        background: var(--paper);
+        color: var(--ink);
+        padding: 10px 16px;
+        cursor: pointer;
+      }
+      button:hover:not(:disabled) {
+        border-color: var(--ink-muted);
+      }
+      button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+      button.primary {
+        background: var(--teal);
+        border-color: var(--teal);
+        color: var(--paper);
+        font-weight: 600;
+      }
+      button.primary:hover:not(:disabled) {
+        background: var(--teal-strong);
+        border-color: var(--teal-strong);
+      }
+      button.hardware {
+        background: var(--amber-muted);
+        border-color: var(--amber);
+        color: var(--ink);
+        font-weight: 600;
+      }
+      button:focus-visible,
+      a:focus-visible {
+        outline: 2px solid var(--teal-strong);
+        outline-offset: 2px;
+      }
+      .rail {
+        list-style: none;
+        margin: 0 0 20px;
+        padding: 0;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0;
+        border: 1px solid var(--rule);
+        border-radius: var(--panel);
+        overflow: hidden;
+        background: var(--paper);
+      }
+      .rail li {
+        flex: 1 1 0;
+        min-width: 108px;
+        padding: 10px 12px;
+        font-size: 0.8125rem;
+        border-right: 1px solid var(--rule);
+        color: var(--ink-muted);
+        background: var(--paper);
+      }
+      .rail li:last-child {
+        border-right: 0;
+      }
+      .rail li.done {
+        background: #eef5f3;
+        color: var(--teal-strong);
+      }
+      .rail li.active {
+        background: var(--paper);
+        color: var(--ink);
+        font-weight: 700;
+        box-shadow: inset 0 -3px 0 var(--teal);
+      }
+      .rail li.touch.active {
+        box-shadow: inset 0 -3px 0 var(--amber);
+      }
+      .rail .n {
+        display: block;
+        font-size: 0.6875rem;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+      .caps {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+      .caps li {
+        display: flex;
+        gap: 10px;
+        align-items: flex-start;
+        padding: 9px 0;
+        border-bottom: 1px solid var(--rule);
+        font-size: 0.9375rem;
+      }
+      .caps li:last-child {
+        border-bottom: 0;
+      }
+      .mark {
+        font-weight: 700;
+        flex: none;
+        width: 1.25em;
+      }
+      .allow .mark {
+        color: var(--success);
+      }
+      .block .mark {
+        color: var(--danger);
+      }
+      .block {
+        color: var(--ink-muted);
+      }
+      .stage {
+        border-left: 3px solid var(--teal);
+        padding-left: 16px;
+        margin-bottom: 20px;
+      }
+      .stage.touch {
+        border-left-color: var(--amber);
+      }
+      .badge {
+        display: inline-block;
+        font-size: 0.6875rem;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        font-weight: 700;
+        padding: 3px 8px;
+        border-radius: var(--control);
+        background: var(--paper-muted);
+        color: var(--ink-muted);
+      }
+      .badge.amber {
+        background: var(--amber-muted);
+        color: var(--amber);
+      }
+      .out {
+        background: #10201e;
+        color: #d8e6e3;
+        border-radius: var(--panel);
+        padding: 18px 20px;
+        font-family: var(--mono);
+        font-size: 0.8125rem;
+        line-height: 1.6;
+        overflow-x: auto;
+        white-space: pre-wrap;
+        word-break: break-word;
+        margin: 0;
+      }
+      .out .ok {
+        color: #7fd0a6;
+      }
+      .out .no {
+        color: #f2a3a3;
+      }
+      .out .dim {
+        color: #7d918d;
+      }
+      .keys {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+        margin: 16px 0 0;
+      }
+      .keycard {
+        border: 1px solid var(--rule);
+        border-radius: var(--panel);
+        padding: 14px 16px;
+        background: var(--paper);
+      }
+      .keycard .lab {
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--ink-muted);
+        font-weight: 600;
+      }
+      .keycard .val {
+        font-family: var(--mono);
+        font-size: 0.75rem;
+        word-break: break-all;
+        margin-top: 6px;
+      }
+      .note {
+        font-size: 0.875rem;
+        color: var(--ink-muted);
+      }
+      .actions {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin: 18px 0 0;
+      }
+      .scroll-x {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+      }
+      .scroll-x table {
+        min-width: 560px;
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        font-size: 0.9375rem;
+      }
+      th,
+      td {
+        text-align: left;
+        padding: 10px 12px;
+        border-bottom: 1px solid var(--rule);
+        vertical-align: top;
+      }
+      th {
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--ink-muted);
+      }
+      ul.plain {
+        margin: 0 0 16px;
+        padding-left: 20px;
+      }
+      ul.plain li {
+        margin-bottom: 8px;
+      }
+      footer.site {
+        border-top: 1px solid var(--rule);
+        background: var(--paper);
+        padding: 32px 0;
+        font-size: 0.875rem;
+        color: var(--ink-muted);
+      }
+      .status {
+        border-radius: var(--control);
+        padding: 12px 14px;
+        font-size: 0.9375rem;
+        margin-top: 16px;
+        border: 1px solid var(--rule);
+        background: var(--paper-muted);
+      }
+      .status[data-tone='valid'] {
+        border-color: var(--success);
+        background: #eaf5ef;
+        color: #1c5c39;
+      }
+      .status[data-tone='invalid'] {
+        border-color: var(--danger);
+        background: #fbecec;
+        color: #8d2c2c;
+      }
+      .status[data-tone='amber'] {
+        border-color: var(--amber);
+        background: var(--amber-muted);
+        color: #7a4805;
+      }
+      @media (max-width: 820px) {
+        .grid2,
+        .keys {
+          grid-template-columns: 1fr;
+        }
+        h1 {
+          font-size: 1.75rem;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        * {
+          transition: none !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="site">
+      <div class="wrap">
+        <span class="brand">Human Checkpoint <span>· field service</span></span>
+        <nav class="site">
+          <a href="#watch">Watch</a>
+          <a href="#walkthrough">Walkthrough</a>
+          <a href="#gate">Gate console</a>
+          <a href="#yubikey">YubiKey</a>
+          <a href="#nodejs">Node.js libs</a>
+          <a href="#moltnet">MoltNet</a>
+          <a href="#verify">Verify it</a>
+          <a href="https://github.com/getlarge/human-checkpoint">Source</a>
+        </nav>
+      </div>
+    </header>
+
+    <div class="wrap">
+      <div class="hero">
+        <p class="kicker">YubiKey 5.8 · previewSign · ARKG</p>
+        <h1>Hardware-bound approvals for AI service workflows</h1>
+        <blockquote class="tag">
+          The agent can ask. Only a human can answer.
+        </blockquote>
+        <p class="lede">
+          An AI agent prepares a field-service job: it reviews the request,
+          reads approved service history, and drafts a technician brief. It
+          cannot take either consequential step on its own. A technician
+          approves each one by touching the same enrolled YubiKey 5.8 — and each
+          touch signs the exact bytes on screen under a
+          <strong>different</strong> request-scoped key.
+        </p>
+        <p class="lede">
+          Most systems put the hardware key at the front door. Human Checkpoint
+          puts it inside the agent's action boundary, at the two moments where
+          the agent would otherwise act alone.
+        </p>
+        <div class="actions">
+          <button
+            class="primary"
+            onclick="
+              document
+                .getElementById('walkthrough')
+                .scrollIntoView({ behavior: 'smooth' })
+            "
+          >
+            Walk the flow
+          </button>
+          <button
+            class="hardware"
+            onclick="
+              document
+                .getElementById('verify')
+                .scrollIntoView({ behavior: 'smooth' })
+            "
+          >
+            Verify the real signatures
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <section id="watch">
+      <div class="wrap">
+        <p class="kicker">Recorded walkthrough</p>
+        <h2>Watch the real ceremony</h2>
+        <p>
+          The full workflow end to end, including both physical YubiKey touches.
+          Captions are burned in — it reads fine muted.
+        </p>
+        <figure id="video-figure" style="margin: 0">
+          <video
+            id="demo-video"
+            controls
+            playsinline
+            preload="metadata"
+            poster="demo-assets/01-request-queue.png"
+            style="
+              width: 100%;
+              border: 1px solid var(--rule);
+              border-radius: var(--panel);
+              background: #10201e;
+              display: block;
+            "
+          >
+            <source src="demo-assets/walkthrough.mp4" type="video/mp4" />
+            <source src="demo-assets/walkthrough.webm" type="video/webm" />
+          </video>
+          <figcaption class="note" style="margin-top: 10px" id="video-caption">
+            Recorded on the live product UI. The operator performs only the two
+            hardware touches; every other action travels through the visible
+            dashboard.
+          </figcaption>
+        </figure>
+        <div class="status" id="video-missing" hidden data-tone="amber">
+          <strong>The recording is not published yet.</strong> Drop
+          <code>walkthrough.mp4</code> (or <code>.webm</code>) into
+          <code>docs/demo-assets/</code>, or set a public URL at the top of this
+          page's script, and the player appears here.
+        </div>
+      </div>
+    </section>
+
+    <section id="walkthrough">
+      <div class="wrap">
+        <p class="kicker">Annotated walkthrough</p>
+        <h2>Walk the technician's flow</h2>
+        <p>
+          Step through the workflow. The right-hand panel tracks what the agent
+          is permitted to do at each stage.
+        </p>
+        <p class="note">
+          This section is narration, not a live system — the real workflow needs
+          Docker, MoltNet, Ory, Node-RED, the agent daemon, the signer companion
+          and a physical key. To actually execute the authorization logic, use
+          <a href="#gate">the gate console below</a>, which runs the shipped
+          code.
+        </p>
+
+        <ol class="rail" id="rail"></ol>
+
+        <div class="grid2">
+          <div class="panel">
+            <div class="stage" id="stage">
+              <span class="badge" id="stage-badge">Step</span>
+              <h3 id="stage-title">…</h3>
+              <p id="stage-body" style="margin-bottom: 0"></p>
+            </div>
+            <div id="stage-detail"></div>
+            <div class="actions">
+              <button id="back">Back</button>
+              <button class="primary" id="next">Next</button>
+              <button id="probe">Try: make the agent search now</button>
+            </div>
+            <div class="status" id="probe-out" hidden role="status"></div>
+          </div>
+
+          <div class="panel">
+            <p class="kicker" style="margin-bottom: 8px">
+              Agent capability right now
+            </p>
+            <ul class="caps" id="caps"></ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="gate">
+      <div class="wrap">
+        <p class="kicker">Interactive · real code</p>
+        <h2>Run the real authorization gate</h2>
+        <p>
+          The buttons below call
+          <code>assertApprovedCheckpoint()</code> — the same compiled function
+          from <code>@human-checkpoint/core</code> that the agent runtime calls
+          before it is allowed to touch a public source. It is loaded into this
+          page unmodified, and it decides against the real recorded approval
+          from the evidence bundle.
+        </p>
+        <p class="note">
+          What this is not: it does not contact MoltNet, and it does not perform
+          a ceremony. It replays a recorded approval through the genuine gate,
+          so the verdicts and reason strings are produced by the shipped code
+          rather than written for this page. Expiry is evaluated as of the
+          moment the approval completed.
+        </p>
+
+        <div class="panel">
+          <h3 style="margin-bottom: 6px">Ask the gate for permission</h3>
+          <p class="note" style="margin-bottom: 0">
+            Each button changes one thing about what the caller claims, then
+            asks the gate.
+          </p>
+          <div class="actions">
+            <button class="primary" id="g-ok">The real approval</button>
+            <button id="g-none">No approval yet</button>
+            <button id="g-team">Wrong team</button>
+            <button id="g-cp">Wrong checkpoint</button>
+            <button id="g-req">Wrong request ID</button>
+            <button id="g-msg">Message altered by one character</button>
+            <button id="g-exp">Approval expired</button>
+          </div>
+          <div class="status" id="g-out" hidden role="status"></div>
+          <pre class="out" id="g-log" style="margin-top: 16px">
+Pick a case above to call the gate.</pre
+          >
+        </div>
+      </div>
+    </section>
+
+    <section id="yubikey">
+      <div class="wrap">
+        <h2>What the YubiKey actually does here</h2>
+        <div class="grid2">
+          <div>
+            <p>
+              The key is not proving <em>who is logged in</em>. It is signing
+              <em>what is about to happen</em>. Before each touch, MoltNet fixes
+              the exact decision — queries, domains, result limit, reason, team,
+              purpose, expiry — and canonicalises it to bytes. The signature
+              covers those bytes.
+            </p>
+            <p>
+              previewSign is a YubiKey 5.8 firmware-preview extension. Its
+              useful property here is <strong>ARKG</strong>: MoltNet can derive
+              a fresh public key for each signing request and prepare
+              verification material <em>before</em> the private operation
+              happens, while the private key never leaves the key.
+            </p>
+            <p>
+              That is why one physical key produces two different public keys
+              below. Each decision is separately attributable; neither can be
+              replayed as the other.
+            </p>
+          </div>
+          <div class="panel">
+            <h3>What a valid signature proves</h3>
+            <ul class="caps">
+              <li class="allow">
+                <span class="mark">✓</span
+                ><span>This exact decision was shown to a human</span>
+              </li>
+              <li class="allow">
+                <span class="mark">✓</span
+                ><span>That human touched an enrolled key</span>
+              </li>
+              <li class="allow">
+                <span class="mark">✓</span
+                ><span>Not one byte changed afterwards</span>
+              </li>
+              <li class="block">
+                <span class="mark">✕</span
+                ><span>That the maintenance decision was <em>correct</em></span>
+              </li>
+              <li class="block">
+                <span class="mark">✕</span
+                ><span
+                  >Anonymity — claimant and credential IDs are retained by
+                  design</span
+                >
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="nodejs">
+      <div class="wrap">
+        <p class="kicker">Ecosystem gap</p>
+        <h2>There was no Node.js path, so we built one</h2>
+        <div class="grid2">
+          <div>
+            <p>
+              <code>previewSign</code> is the primitive this project stands on.
+              Reaching it from Node.js turned out to be the hard part.
+            </p>
+            <p>
+              Yubico's own
+              <a href="https://github.com/YubicoLabs/build-with-us"
+                >build-with-us</a
+              >
+              quickstarts cover iOS/macOS, Android, .NET and Python — there is
+              no JavaScript or TypeScript path. And the browser cannot help: the
+              WebAuthn extension that would expose this to web pages,
+              <a href="https://github.com/w3c/webauthn/pull/2078"
+                >w3c/webauthn#2078</a
+              >, has been a <strong>draft since September 2024</strong>. No
+              browser ships it.
+            </p>
+            <p>
+              So we wrote the missing layer and published it under MIT, so
+              anyone hitting the same wall can use it without adopting our
+              licence.
+            </p>
+            <p class="note">
+              Usage, enrollment, signing and verification:
+              <a
+                href="https://github.com/getlarge/human-checkpoint/blob/main/docs/nodejs-previewsign.md"
+                >docs/nodejs-previewsign.md</a
+              >.
+            </p>
+          </div>
+          <div class="panel">
+            <h3>What we published</h3>
+            <ul class="caps">
+              <li class="allow">
+                <span class="mark">✓</span>
+                <span>
+                  <code>@themoltnet/ctap</code> <small>· MIT</small><br />
+                  <span class="note"
+                    >Minimal CTAP2/HID transport for Node.js.</span
+                  ><br />
+                  <span class="note">
+                    <a href="https://www.npmjs.com/package/@themoltnet/ctap"
+                      >npm</a
+                    >
+                    ·
+                    <a
+                      href="https://github.com/getlarge/themoltnet/tree/main/libs/ctap"
+                      >source</a
+                    >
+                  </span>
+                </span>
+              </li>
+              <li class="allow">
+                <span class="mark">✓</span>
+                <span>
+                  <code>@themoltnet/yubikey-preview-sign</code>
+                  <small>· MIT</small><br />
+                  <span class="note"
+                    >Enrollment, ARKG derivation, signing, offline verification,
+                    and conformance test vectors.</span
+                  ><br />
+                  <span class="note">
+                    <a
+                      href="https://www.npmjs.com/package/@themoltnet/yubikey-preview-sign"
+                      >npm</a
+                    >
+                    ·
+                    <a
+                      href="https://github.com/getlarge/themoltnet/tree/main/libs/yubikey-preview-sign"
+                      >source</a
+                    >
+                  </span>
+                </span>
+              </li>
+              <li class="allow">
+                <span class="mark">✓</span>
+                <span>
+                  <code>@themoltnet/signer</code> <small>· AGPL-3.0-only</small
+                  ><br />
+                  <span class="note"
+                    >Loopback companion that lets a browser reach a key the web
+                    platform cannot yet address.</span
+                  ><br />
+                  <span class="note">
+                    <a href="https://www.npmjs.com/package/@themoltnet/signer"
+                      >npm</a
+                    >
+                    ·
+                    <a
+                      href="https://github.com/getlarge/themoltnet/tree/main/apps/moltnet-signer"
+                      >source</a
+                    >
+                    ·
+                    <a href="https://docs.themolt.net/understand/signing"
+                      >docs</a
+                    >
+                  </span>
+                </span>
+              </li>
+            </ul>
+            <p class="note" style="margin: 16px 0 0">
+              The verifier further down this page runs that library's
+              browser-safe verification path — it deliberately pulls in no HID
+              or CTAP code, so verification runs where the hardware never goes.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="moltnet">
+      <div class="wrap">
+        <h2>Who holds which authority</h2>
+        <p>
+          Three systems, each authoritative for one thing. No component trusts
+          its own cache when an approval is on the line.
+        </p>
+        <div class="scroll-x">
+          <table>
+            <thead>
+              <tr>
+                <th style="width: 22%">Component</th>
+                <th style="width: 30%">Authoritative for</th>
+                <th>The rule that makes it hold</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>YubiKey 5.8</strong></td>
+                <td>The human decision itself</td>
+                <td>
+                  Private key never leaves the device. ARKG derives a distinct
+                  public key per signing request.
+                </td>
+              </tr>
+              <tr>
+                <td><strong>MoltNet</strong></td>
+                <td>Identity, tasks, signing requests, runtime profile</td>
+                <td>
+                  Every approval is <em>re-fetched</em> before it can unlock an
+                  action. The runtime profile pins
+                  <code>toolEnforcement: enforce</code>, an allowed-host sandbox
+                  of <code>api.exa.ai</code> only, and no unattended shell.
+                </td>
+              </tr>
+              <tr>
+                <td><strong>Node-RED</strong></td>
+                <td>Durable orchestration</td>
+                <td>
+                  Stable workflow IDs, idempotent steps, append-only events in
+                  SQLite. A cached "completed" can never unlock a call or a
+                  release.
+                </td>
+              </tr>
+              <tr>
+                <td><strong>The model</strong></td>
+                <td>Nothing consequential</td>
+                <td>
+                  Its public-source tool accepts only a signing-request ID and
+                  re-derives every query, domain, and limit from the signed
+                  message. It can name
+                  <em>which</em> approval to use, never <em>what</em> it
+                  authorises.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="note" style="margin-top: 16px">
+          Full provisioning reference — OAuth clients and scopes, the runtime
+          policy and profile, the agent daemon invocation, and troubleshooting —
+          is in
+          <a
+            href="https://github.com/getlarge/human-checkpoint/blob/main/docs/moltnet.md"
+            ><code>docs/moltnet.md</code></a
+          >.
+        </p>
+      </div>
+    </section>
+
+    <section id="verify">
+      <div class="wrap">
+        <p class="kicker">Interactive · real cryptography</p>
+        <h2>Verify the real signatures, in this browser</h2>
+        <p>
+          Below is a genuine <code>human-checkpoint-proof:v1</code> record. Both
+          signatures in it were produced by one physical YubiKey 5.8 during an
+          actual ceremony on 2026-08-05. Nothing here is mocked or replayed.
+        </p>
+        <p>
+          Pressing verify runs real ECDSA P-256 verification with the Web Crypto
+          API — it rebuilds the signed payload from the canonical message and
+          nonce, recomputes the digest, and checks each signature against its
+          derived public key. No server is contacted.
+        </p>
+
+        <div class="panel">
+          <div class="actions" style="margin-top: 0">
+            <button class="primary" id="btn-verify">
+              Verify both signatures
+            </button>
+            <button class="hardware" id="btn-tamper" disabled>
+              Change one character and verify again
+            </button>
+            <button id="btn-reset" disabled>Reset</button>
+          </div>
+          <p class="note" style="margin: 12px 0 0">
+            The tamper check alters one character of the field note in a
+            <em>copy</em>. The record itself is never modified.
+          </p>
+          <div class="status" id="verdict" hidden role="status"></div>
+          <div class="keys" id="keys" hidden></div>
+          <h3 style="margin: 24px 0 10px; font-size: 0.9375rem">
+            Verification log
+          </h3>
+          <pre class="out" id="log">
+Press “Verify both signatures” to run the checks in your browser.</pre
+          >
+        </div>
+
+        <p class="note" style="margin-top: 16px">
+          The same checks run in Node against the committed record with
+          <code>node scripts/verify-evidence.mjs</code>, which additionally
+          validates the aggregate proof hash and full envelope metadata.
+        </p>
+      </div>
+    </section>
+
+    <section id="limits">
+      <div class="wrap">
+        <h2>Honest limitations</h2>
+        <ul class="plain">
+          <li>
+            previewSign is a Yubico firmware-preview extension, not generic
+            WebAuthn or PIV signing. Firmware 5.8 alone does not prove a key
+            supports it.
+          </li>
+          <li>
+            The evidence retains claimant and credential identifiers. This is
+            request-scoped key separation and exact-byte accountability — not
+            anonymous or unlinkable signing.
+          </li>
+          <li>
+            A valid signature proves the approval ceremony. It does not certify
+            the maintenance decision or make AI-generated guidance correct.
+          </li>
+          <li>
+            The local seed includes a second credential-manager identity because
+            MoltNet forbids a credential owner from activating their own
+            credential.
+          </li>
+          <li>
+            SQLite suits this single-server demonstration. Multi-instance
+            production orchestration would need coordinated storage and leasing.
+          </li>
+          <li>
+            All service requests and equipment details are synthetic demo
+            content.
+          </li>
+        </ul>
+      </div>
+    </section>
+
+    <footer class="site">
+      <div class="wrap">
+        <p style="margin-bottom: 8px">
+          <a href="https://github.com/getlarge/human-checkpoint">Source</a> ·
+          <a
+            href="https://github.com/getlarge/human-checkpoint/blob/main/README.md"
+            >README</a
+          >
+          ·
+          <a
+            href="https://github.com/getlarge/human-checkpoint/blob/main/docs/moltnet.md"
+            >MoltNet reference</a
+          >
+          ·
+          <a
+            href="https://github.com/getlarge/human-checkpoint/tree/main/docs/evidence"
+            >Evidence bundle</a
+          >
+        </p>
+        <p style="margin: 0">
+          AGPL-3.0-only. Synthetic demo content throughout.
+        </p>
+      </div>
+    </footer>
+
+    <script type="module">
+      import { assertApprovedCheckpoint } from './vendor/core/gate.js';
+
+      // ---------- Demo video ----------
+      // Set this to a public URL (YouTube, Vimeo, or a direct file) once the
+      // recording is published. Leave empty to use docs/demo-assets/walkthrough.*
+      const VIDEO_URL = '';
+
+      (function setUpVideo() {
+        const video = document.getElementById('demo-video');
+        const figure = document.getElementById('video-figure');
+        const missing = document.getElementById('video-missing');
+        const caption = document.getElementById('video-caption');
+
+        const embeddable = /(?:youtube\.com|youtu\.be|vimeo\.com)/i;
+        if (VIDEO_URL && embeddable.test(VIDEO_URL)) {
+          const id = VIDEO_URL.match(
+            /(?:v=|youtu\.be\/|vimeo\.com\/)([A-Za-z0-9_-]+)/,
+          );
+          const src = /vimeo/i.test(VIDEO_URL)
+            ? `https://player.vimeo.com/video/${id ? id[1] : ''}`
+            : `https://www.youtube-nocookie.com/embed/${id ? id[1] : ''}`;
+          figure.insertAdjacentHTML(
+            'afterbegin',
+            `<div style="position:relative;padding-top:56.25%;border:1px solid var(--rule);border-radius:var(--panel);overflow:hidden"><iframe src="${src}" title="Human Checkpoint walkthrough" allow="fullscreen; picture-in-picture" allowfullscreen style="position:absolute;inset:0;width:100%;height:100%;border:0"></iframe></div>`,
+          );
+          video.remove();
+          return;
+        }
+        if (VIDEO_URL) video.querySelector('source').src = VIDEO_URL;
+
+        // A missing file surfaces as an error on the last <source>; show the
+        // placeholder rather than a dead player.
+        video.addEventListener('error', reveal, true);
+        video.addEventListener('loadedmetadata', () => {
+          missing.hidden = true;
+        });
+        setTimeout(() => {
+          if (!video.videoWidth && video.networkState === 3) reveal();
+        }, 1200);
+
+        function reveal() {
+          if (!missing.hidden) return;
+          video.style.display = 'none';
+          caption.hidden = true;
+          missing.hidden = false;
+        }
+      })();
+
+      // ---------- Interactive walkthrough ----------
+      const STEPS = [
+        {
+          n: 'Step 1',
+          rail: 'Assigned',
+          title: 'The request is assigned',
+          badge: 'No agent work yet',
+          body: 'A pump vibration job, SR-2048, lands in the technician queue. Nothing has been prepared. No MoltNet task exists.',
+          detail:
+            'This is the state judges most often assume away: before any approval, the agent has genuinely not started. There is no draft waiting to be rubber-stamped.',
+          caps: [
+            [false, 'Review approved service history'],
+            [false, 'Search public equipment sources'],
+            [false, 'Prepare a technician brief'],
+            [false, 'Release a work order'],
+          ],
+        },
+        {
+          n: 'Step 2',
+          rail: 'Scope shown',
+          title: 'The exact scope is put in front of the human',
+          badge: 'Decision fixed',
+          body: 'The technician sees the precise equipment queries proposed, the allowed sites, the result limit, the reason, and a five-minute expiry.',
+          detail:
+            'MoltNet canonicalises all of it to bytes now. Whatever gets signed is what is on screen — the scope cannot drift between display and approval.',
+          caps: [
+            [false, 'Review approved service history'],
+            [false, 'Search public equipment sources'],
+            [false, 'Prepare a technician brief'],
+            [false, 'Release a work order'],
+          ],
+        },
+        {
+          n: 'Touch 1',
+          rail: 'Claim',
+          title: 'The technician claims the request',
+          badge: 'Hardware touch',
+          touch: true,
+          body: 'One physical touch on the enrolled YubiKey signs the canonical claim. ARKG derives a request-scoped public key for this decision alone.',
+          detail:
+            'Only now does Node-RED start the MoltNet tasks. The signature is the trigger, not a receipt filed after the fact.',
+          caps: [
+            [true, 'Review approved service history'],
+            [true, 'Search public sources — within the signed scope only'],
+            [true, 'Prepare a technician brief'],
+            [false, 'Release a work order'],
+          ],
+        },
+        {
+          n: 'Step 4',
+          rail: 'Agent works',
+          title: 'The agent does its work',
+          badge: 'Scoped execution',
+          body: 'Two MoltNet tasks run: review the approved same-customer history, then prepare the brief. The runtime re-fetches the signed approval before the Exa call.',
+          detail:
+            'The tool takes every query, domain, and result limit from the signed message. A model that asks for a different search does not get one — it gets an error.',
+          caps: [
+            [true, 'Review approved service history'],
+            [true, 'Search public sources — within the signed scope only'],
+            [true, 'Prepare a technician brief'],
+            [false, 'Release a work order'],
+          ],
+        },
+        {
+          n: 'Step 5',
+          rail: 'Field note',
+          title: 'The technician adds a field note',
+          badge: 'Human judgement',
+          body: 'A required, append-only note records what the technician actually found on site. The brief is immutable at this point.',
+          detail:
+            'The note is the part no agent can produce. It is bound into the release decision alongside the brief, disposition, team, role, and shift.',
+          caps: [
+            [true, 'Review approved service history'],
+            [true, 'Search public sources — within the signed scope only'],
+            [true, 'Prepare a technician brief'],
+            [false, 'Release a work order'],
+          ],
+        },
+        {
+          n: 'Touch 2',
+          rail: 'Release',
+          title: 'The technician releases the work order',
+          badge: 'Hardware touch',
+          touch: true,
+          body: 'The same physical key signs the release — under a second, different derived key. Node-RED re-fetches and re-canonicalises before finalising.',
+          detail:
+            'Editing locks once bound. A change does not refresh the approval; it requires a fresh ceremony.',
+          caps: [
+            [true, 'Review approved service history'],
+            [true, 'Search public sources — within the signed scope only'],
+            [true, 'Prepare a technician brief'],
+            [true, 'Release — now signed and closed'],
+          ],
+        },
+        {
+          n: 'Result',
+          rail: 'Evidence',
+          title: 'Portable evidence leaves the building',
+          badge: 'Offline verifiable',
+          body: 'The exported record verifies with no MoltNet, no companion, and no YubiKey — as you can do further down this page.',
+          detail:
+            'Two valid signatures, two different request-scoped public keys, and a canonical message that fails verification if one character changes.',
+          caps: [
+            [true, 'Review approved service history'],
+            [true, 'Search public sources — within the signed scope only'],
+            [true, 'Prepare a technician brief'],
+            [true, 'Release — now signed and closed'],
+          ],
+        },
+      ];
+
+      let cursor = 0;
+      const $ = (id) => document.getElementById(id);
+
+      function renderRail() {
+        $('rail').innerHTML = STEPS.map(
+          (s, i) =>
+            `<li class="${i < cursor ? 'done' : ''}${i === cursor ? ' active' : ''}${
+              s.touch ? ' touch' : ''
+            }"><span class="n">${s.n}</span>${s.rail}</li>`,
+        ).join('');
+      }
+
+      function renderStep() {
+        const s = STEPS[cursor];
+        $('stage').className = 'stage' + (s.touch ? ' touch' : '');
+        $('stage-badge').className = 'badge' + (s.touch ? ' amber' : '');
+        $('stage-badge').textContent = s.badge;
+        $('stage-title').textContent = s.title;
+        $('stage-body').textContent = s.body;
+        $('stage-detail').innerHTML = `<p class="note">${s.detail}</p>`;
+        $('caps').innerHTML = s.caps
+          .map(
+            ([ok, label]) =>
+              `<li class="${ok ? 'allow' : 'block'}"><span class="mark">${
+                ok ? '✓' : '✕'
+              }</span><span>${label}</span></li>`,
+          )
+          .join('');
+        $('back').disabled = cursor === 0;
+        $('next').disabled = cursor === STEPS.length - 1;
+        $('probe-out').hidden = true;
+        renderRail();
+      }
+
+      $('next').onclick = () => {
+        if (cursor < STEPS.length - 1) cursor++;
+        renderStep();
+      };
+      $('back').onclick = () => {
+        if (cursor > 0) cursor--;
+        renderStep();
+      };
+      $('probe').onclick = () => {
+        const out = $('probe-out');
+        out.hidden = false;
+        // Ask the real gate, with or without the recorded approval depending on
+        // where the reader is in the story.
+        const verdict = callGate(cursor >= 2 ? 'ok' : 'none');
+        if (verdict.allowed) {
+          out.dataset.tone = 'valid';
+          out.innerHTML =
+            '<strong>Allowed — but only as signed.</strong> The gate returned the approved scope, and the tool rebuilds its query from that canonical message. Asking for a different domain or a larger result set is a different message, so it fails.';
+        } else {
+          out.dataset.tone = 'invalid';
+          out.innerHTML =
+            '<strong>Blocked by the real gate.</strong> <code>' +
+            esc(verdict.error) +
+            '</code> — there is no approval to re-fetch, so the public-source tool refuses before Exa is contacted.';
+        }
+      };
+
+      renderStep();
+
+      // ---------- Real authorization gate ----------
+      const PROOF = await (
+        await fetch('./vendor/human-checkpoint-proof.json')
+      ).json();
+
+      const RESEARCH = PROOF.checkpoints.find(
+        (c) => c.checkpoint === 'research-authorization',
+      );
+
+      // The gate takes a signing-request view. The evidence bundle stores the
+      // same fields, plus the canonical message and a completed receipt.
+      function recordedRequest() {
+        return {
+          ...RESEARCH.request,
+          message: RESEARCH.canonicalMessage,
+          receipt: RESEARCH.evidence,
+        };
+      }
+      function baseExpectation() {
+        return {
+          requestId: RESEARCH.request.id,
+          teamId: PROOF.teamId,
+          checkpoint: 'research-authorization',
+          purpose: RESEARCH.request.purpose,
+          canonicalMessage: RESEARCH.canonicalMessage,
+          now: new Date(RESEARCH.request.completedAt),
+        };
+      }
+
+      const GATE_CASES = {
+        ok: { label: 'The real recorded approval', mutate: () => {} },
+        none: {
+          label: 'No approval exists yet',
+          mutate: (s) => {
+            s.request = null;
+          },
+        },
+        team: {
+          label: 'Caller claims a different team',
+          mutate: (s) => {
+            s.expected.teamId = '00000000-0000-0000-0000-000000000000';
+          },
+        },
+        cp: {
+          label: 'Approval reused for the other checkpoint',
+          mutate: (s) => {
+            s.expected.checkpoint = 'field-release';
+          },
+        },
+        req: {
+          label: 'Caller names a different signing request',
+          mutate: (s) => {
+            s.expected.requestId = '11111111-1111-1111-1111-111111111111';
+          },
+        },
+        msg: {
+          label: 'Signed message altered by one character',
+          mutate: (s) => {
+            s.request.message = s.request.message.replace(
+              'drive-end',
+              'Drive-end',
+            );
+          },
+        },
+        exp: {
+          label: 'Same approval, evaluated after its expiry',
+          mutate: (s) => {
+            s.expected.now = new Date(
+              new Date(RESEARCH.request.expiresAt).getTime() + 60_000,
+            );
+          },
+        },
+      };
+
+      function callGate(which) {
+        const state = {
+          request: recordedRequest(),
+          expected: baseExpectation(),
+        };
+        GATE_CASES[which].mutate(state);
+        try {
+          const envelope = assertApprovedCheckpoint(
+            state.request,
+            state.expected,
+          );
+          return { allowed: true, envelope };
+        } catch (error) {
+          return { allowed: false, error: error.message, name: error.name };
+        }
+      }
+
+      function renderGate(which) {
+        const c = GATE_CASES[which];
+        const verdict = callGate(which);
+        const out = $('g-out');
+        const lines = [];
+        lines.push(`<span class="dim">case    </span>${esc(c.label)}`);
+        lines.push(
+          `<span class="dim">call    </span>assertApprovedCheckpoint(request, expected)`,
+        );
+        lines.push('');
+        out.hidden = false;
+        if (verdict.allowed) {
+          out.dataset.tone = 'valid';
+          out.innerHTML =
+            '<strong>Allowed.</strong> The gate returned the approved scope, so the agent may run exactly this lookup.';
+          const p = verdict.envelope.payload;
+          lines.push(`<span class="ok">✓ allowed</span>`);
+          lines.push('');
+          lines.push(
+            `<span class="dim">approved scope, taken from the signed message</span>`,
+          );
+          for (const q of p.queries || []) lines.push(`  query   ${esc(q)}`);
+          for (const d of p.domains || [])
+            lines.push(`  domain  ${esc(d.name ?? d)}`);
+          if (p.resultLimit !== undefined)
+            lines.push(`  limit   ${esc(p.resultLimit)}`);
+        } else {
+          out.dataset.tone = 'invalid';
+          out.innerHTML =
+            '<strong>Denied.</strong> <code>' +
+            esc(verdict.error) +
+            '</code> — thrown by the shipped gate, not written for this page.';
+          lines.push(`<span class="no">✕ ${esc(verdict.name)}</span>`);
+          lines.push(`  ${esc(verdict.error)}`);
+        }
+        $('g-log').innerHTML = lines.join('\n');
+      }
+
+      for (const [key, id] of Object.entries({
+        ok: 'g-ok',
+        none: 'g-none',
+        team: 'g-team',
+        cp: 'g-cp',
+        req: 'g-req',
+        msg: 'g-msg',
+        exp: 'g-exp',
+      })) {
+        $(id).onclick = () => renderGate(key);
+      }
+
+      // ---------- Real in-browser verification ----------
+      const enc = new TextEncoder();
+      const dec = new TextDecoder();
+      let tampered = false;
+
+      const b64uToBytes = (s) => {
+        const pad = s.replace(/-/g, '+').replace(/_/g, '/');
+        const bin = atob(pad + '='.repeat((4 - (pad.length % 4)) % 4));
+        return Uint8Array.from(bin, (c) => c.charCodeAt(0));
+      };
+      const bytesToB64u = (b) =>
+        btoa(String.fromCharCode(...b))
+          .replace(/\+/g, '-')
+          .replace(/\//g, '_')
+          .replace(/=+$/, '');
+
+      async function sha256(bytes) {
+        return new Uint8Array(await crypto.subtle.digest('SHA-256', bytes));
+      }
+
+      // previewSign signs the 32-byte prehash directly, so verifying the raw
+      // envelope bytes with ECDSA/SHA-256 checks the identical value.
+      function buildSigningBytes(messageHash, nonce) {
+        const prefix = enc.encode('moltnet:v1');
+        const nonceBytes = enc.encode(nonce);
+        const out = new Uint8Array(
+          prefix.length + 4 + messageHash.length + 4 + nonceBytes.length,
+        );
+        const view = new DataView(out.buffer);
+        let o = 0;
+        out.set(prefix, o);
+        o += prefix.length;
+        view.setUint32(o, messageHash.length);
+        o += 4;
+        out.set(messageHash, o);
+        o += messageHash.length;
+        view.setUint32(o, nonceBytes.length);
+        o += 4;
+        out.set(nonceBytes, o);
+        return out;
+      }
+
+      // Web Crypto wants raw r||s; previewSign emits DER.
+      function derToRaw(der) {
+        let i = 0;
+        if (der[i++] !== 0x30) throw new Error('bad DER sequence');
+        if (der[i] & 0x80) i += 1 + (der[i] & 0x7f);
+        else i += 1;
+        const read = () => {
+          if (der[i++] !== 0x02) throw new Error('bad DER integer');
+          let len = der[i++];
+          let v = der.slice(i, i + len);
+          i += len;
+          while (v.length > 32 && v[0] === 0x00) v = v.slice(1);
+          const p = new Uint8Array(32);
+          p.set(v, 32 - v.length);
+          return p;
+        };
+        const r = read();
+        const s = read();
+        const raw = new Uint8Array(64);
+        raw.set(r, 0);
+        raw.set(s, 32);
+        return raw;
+      }
+
+      async function importKey(jwkish) {
+        return crypto.subtle.importKey(
+          'jwk',
+          { kty: 'EC', crv: 'P-256', x: jwkish.x, y: jwkish.y, ext: true },
+          { name: 'ECDSA', namedCurve: 'P-256' },
+          true,
+          ['verify'],
+        );
+      }
+
+      const esc = (s) =>
+        String(s).replace(
+          /[&<>]/g,
+          (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c],
+        );
+
+      async function verifyCheckpoint(cp, lines) {
+        const label = cp.checkpoint;
+        const ev = cp.evidence;
+        const errors = [];
+
+        const envelopeBytes = b64uToBytes(ev.envelope);
+        const envelope = JSON.parse(dec.decode(envelopeBytes));
+
+        // 1. the signed payload must rebuild exactly from the canonical message
+        const messageHash = await sha256(enc.encode(cp.canonicalMessage));
+        const expected = buildSigningBytes(messageHash, cp.request.nonce);
+        const actual = b64uToBytes(
+          envelope.signingPayload
+            .replace(/\+/g, '-')
+            .replace(/\//g, '_')
+            .replace(/=+$/, ''),
+        );
+        const payloadOk =
+          expected.length === actual.length &&
+          expected.every((b, i) => b === actual[i]);
+        if (!payloadOk)
+          errors.push('canonical message does not match signed payload');
+        lines.push(
+          `  ${payloadOk ? '<span class="ok">✓</span>' : '<span class="no">✕</span>'} signed payload rebuilt from canonical message + nonce`,
+        );
+
+        // 2. the recorded digest must be SHA-256 of the envelope bytes
+        const digest = await sha256(envelopeBytes);
+        const digestOk = bytesToB64u(digest) === ev.digest;
+        if (!digestOk) errors.push('message digest mismatch');
+        lines.push(
+          `  ${digestOk ? '<span class="ok">✓</span>' : '<span class="no">✕</span>'} envelope digest matches recorded digest`,
+        );
+
+        // 3. the hardware signature must verify under the derived key
+        let sigOk = false;
+        try {
+          const key = await importKey(ev.derivedPublicKey);
+          sigOk = await crypto.subtle.verify(
+            { name: 'ECDSA', hash: 'SHA-256' },
+            key,
+            derToRaw(b64uToBytes(ev.signature)),
+            envelopeBytes,
+          );
+        } catch (e) {
+          errors.push('signature could not be checked: ' + e.message);
+        }
+        if (!sigOk) errors.push('ESP256 signature invalid');
+        lines.push(
+          `  ${sigOk ? '<span class="ok">✓</span>' : '<span class="no">✕</span>'} ECDSA P-256 signature verifies under derived key`,
+        );
+
+        return {
+          label,
+          valid: payloadOk && digestOk && sigOk,
+          errors,
+          key: ev.derivedPublicKey,
+        };
+      }
+
+      async function run(useTampered) {
+        const record = JSON.parse(JSON.stringify(PROOF));
+        if (useTampered) {
+          const rel = record.checkpoints.find(
+            (c) => c.checkpoint === 'field-release',
+          );
+          const at = rel.canonicalMessage.indexOf('drive-end');
+          rel.canonicalMessage =
+            rel.canonicalMessage.slice(0, at) +
+            'Drive-end' +
+            rel.canonicalMessage.slice(at + 'drive-end'.length);
+        }
+
+        const lines = [];
+        lines.push(
+          `<span class="dim">record  </span>human-checkpoint-proof:v1 · ${esc(record.serviceRequestId)}`,
+        );
+        lines.push(
+          `<span class="dim">exported</span> ${esc(record.exportedAt)}`,
+        );
+        if (useTampered)
+          lines.push(
+            `<span class="no">tamper  </span>one character changed in the field note (“drive-end” → “Drive-end”)`,
+          );
+        lines.push('');
+
+        const results = [];
+        for (const cp of record.checkpoints) {
+          lines.push(
+            `<span class="dim">checkpoint</span> ${esc(cp.checkpoint)}`,
+          );
+          results.push(await verifyCheckpoint(cp, lines));
+          lines.push('');
+        }
+
+        const keysDiffer = results[0].key.x !== results[1].key.x;
+        lines.push(
+          `${keysDiffer ? '<span class="ok">✓</span>' : '<span class="no">✕</span>'} request-scoped keys differ — one physical key, two derived keys`,
+        );
+
+        const allValid = results.every((r) => r.valid) && keysDiffer;
+        $('log').innerHTML = lines.join('\n');
+
+        const verdict = $('verdict');
+        verdict.hidden = false;
+        if (allValid) {
+          verdict.dataset.tone = 'valid';
+          verdict.innerHTML =
+            '<strong>Verified.</strong> Both YubiKey signatures are valid over the exact approved bytes, under two different request-scoped keys.';
+        } else {
+          verdict.dataset.tone = 'invalid';
+          const first = results.find((r) => !r.valid);
+          verdict.innerHTML =
+            '<strong>Rejected.</strong> ' +
+            esc(first ? first.errors[0] : 'verification failed') +
+            ' — a single altered character breaks the binding between the record and the signature.';
+        }
+
+        $('keys').hidden = false;
+        $('keys').innerHTML = results
+          .map(
+            (r) =>
+              `<div class="keycard"><div class="lab">${esc(r.label)}</div><div class="val">${esc(
+                r.key.x,
+              )}</div></div>`,
+          )
+          .join('');
+
+        $('btn-tamper').disabled = useTampered;
+        $('btn-reset').disabled = !useTampered;
+        tampered = useTampered;
+      }
+
+      $('btn-verify').onclick = () => run(false);
+      $('btn-tamper').onclick = () => run(true);
+      $('btn-reset').onclick = () => run(false);
+    </script>
+  </body>
+</html>

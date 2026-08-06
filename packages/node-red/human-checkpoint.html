@@ -53,6 +53,81 @@
       },
     });
   }
+  RED.nodes.registerType('human-checkpoint-workflow-load', {
+    category: 'Human Checkpoint',
+    color: '#d7ece9',
+    defaults: { name: { value: '' } },
+    inputs: 1,
+    outputs: 1,
+    icon: 'font-awesome/fa-database',
+    label: function () {
+      return this.name || 'Load durable workflow';
+    },
+  });
+  for (const type of ['request-list', 'request-start']) {
+    RED.nodes.registerType(`human-checkpoint-${type}`, {
+      category: 'Human Checkpoint',
+      color: '#d7ece9',
+      defaults: { name: { value: '' } },
+      inputs: 1,
+      outputs: 1,
+      icon: 'font-awesome/fa-list-alt',
+      label: function () {
+        return this.name || `human-checkpoint-${type}`;
+      },
+    });
+  }
+  RED.nodes.registerType('human-checkpoint-task-run', {
+    category: 'Human Checkpoint',
+    color: '#d7ece9',
+    defaults: {
+      name: { value: '' },
+      agent: { value: '', type: 'human-checkpoint-agent', required: true },
+      teamId: { value: '', required: true },
+      diaryId: { value: '', required: true },
+      runtimeProfileId: { value: '' },
+      taskRole: { value: 'request-review', required: true },
+      stepKey: { value: '', required: true },
+      artifactKind: { value: '' },
+    },
+    inputs: 1,
+    outputs: 2,
+    outputLabels: ['completed result', 'live task status'],
+    icon: 'font-awesome/fa-cogs',
+    label: function () {
+      return this.name || 'Run MoltNet agent task';
+    },
+  });
+  RED.nodes.registerType('human-checkpoint-workflow-transition', {
+    category: 'Human Checkpoint',
+    color: '#d7ece9',
+    defaults: {
+      name: { value: '' },
+      state: { value: '', required: true },
+      currentStep: { value: '', required: true },
+      eventType: { value: '', required: true },
+    },
+    inputs: 1,
+    outputs: 1,
+    icon: 'font-awesome/fa-exchange',
+    label: function () {
+      return this.name || 'Record workflow transition';
+    },
+  });
+  RED.nodes.registerType('human-checkpoint-journey-view', {
+    category: 'Human Checkpoint',
+    color: '#d7ece9',
+    defaults: {
+      name: { value: '' },
+      agent: { value: '', type: 'human-checkpoint-agent', required: true },
+    },
+    inputs: 1,
+    outputs: 1,
+    icon: 'font-awesome/fa-eye',
+    label: function () {
+      return this.name || 'Rebuild request view';
+    },
+  });
 </script>
 
 <script type="text/html" data-template-name="human-checkpoint-agent">
@@ -130,5 +205,75 @@
   <div class="form-row">
     <label for="node-input-requestId">Request ID</label
     ><input id="node-input-requestId" placeholder="msg.signingRequestId" />
+  </div>
+</script>
+
+<script
+  type="text/html"
+  data-template-name="human-checkpoint-workflow-load"
+></script>
+<script
+  type="text/html"
+  data-template-name="human-checkpoint-request-list"
+></script>
+<script
+  type="text/html"
+  data-template-name="human-checkpoint-request-start"
+></script>
+
+<script type="text/html" data-template-name="human-checkpoint-task-run">
+  <div class="form-row">
+    <label for="node-input-agent">Agent</label><input id="node-input-agent" />
+  </div>
+  <div class="form-row">
+    <label for="node-input-teamId">Team ID</label
+    ><input id="node-input-teamId" />
+  </div>
+  <div class="form-row">
+    <label for="node-input-diaryId">Diary ID</label
+    ><input id="node-input-diaryId" />
+  </div>
+  <div class="form-row">
+    <label for="node-input-runtimeProfileId">Runtime profile ID</label
+    ><input id="node-input-runtimeProfileId" />
+  </div>
+  <div class="form-row">
+    <label for="node-input-taskRole">Task role</label
+    ><select id="node-input-taskRole">
+      <option value="request-review">Request review</option>
+      <option value="technician-brief">Technician brief</option>
+    </select>
+  </div>
+  <div class="form-row">
+    <label for="node-input-stepKey">Durable step key</label
+    ><input id="node-input-stepKey" />
+  </div>
+  <div class="form-row">
+    <label for="node-input-artifactKind">Artifact kind</label
+    ><input id="node-input-artifactKind" />
+  </div>
+</script>
+
+<script
+  type="text/html"
+  data-template-name="human-checkpoint-workflow-transition"
+>
+  <div class="form-row">
+    <label for="node-input-state">Next state</label
+    ><input id="node-input-state" />
+  </div>
+  <div class="form-row">
+    <label for="node-input-currentStep">Current step</label
+    ><input id="node-input-currentStep" />
+  </div>
+  <div class="form-row">
+    <label for="node-input-eventType">Event type</label
+    ><input id="node-input-eventType" />
+  </div>
+</script>
+
+<script type="text/html" data-template-name="human-checkpoint-journey-view">
+  <div class="form-row">
+    <label for="node-input-agent">Agent</label><input id="node-input-agent" />
   </div>
 </script>

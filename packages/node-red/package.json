@@ -18,6 +18,7 @@
   },
   "scripts": {
     "build": "tsc -b && cp human-checkpoint.html dist/nodes.html",
+    "pretest": "pnpm --filter @human-checkpoint/core build && pnpm --filter @human-checkpoint/store build",
     "test": "vitest run",
     "typecheck": "tsc -b --emitDeclarationOnly"
   },

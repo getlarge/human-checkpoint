@@ -12,6 +12,7 @@
     "bootstrap:local": "node --env-file-if-exists=.env.local scripts/bootstrap-local.mjs",
     "check": "pnpm run format:check && pnpm run typecheck && pnpm run test",
     "dashboard": "pnpm --filter @human-checkpoint/dashboard start",
+    "demo:reset": "node --env-file-if-exists=.env.local scripts/reset-demo.mjs",
     "agent": "pnpm --filter @human-checkpoint/dashboard agent",
     "infra:down": "docker compose --project-name human-checkpoint --env-file infra/.env -f infra/compose.yaml down",
     "infra:logs": "docker compose --project-name human-checkpoint --env-file infra/.env -f infra/compose.yaml logs -f",
@@ -20,12 +21,15 @@
     "seed:runtime": "pnpm --filter @human-checkpoint/dashboard seed:runtime",
     "setup:local": "node scripts/setup-local.mjs",
     "signer": "node --env-file-if-exists=.env.local node_modules/@themoltnet/signer/dist/main.js",
+    "prestart:local": "pnpm --filter @human-checkpoint/node-red build",
     "start:local": "node scripts/start-local.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "pnpm -r test",
     "typecheck": "pnpm -r typecheck",
-    "verify-proof": "pnpm --filter @human-checkpoint/core verify-proof"
+    "verify-proof": "pnpm --filter @human-checkpoint/core verify-proof",
+    "site:build": "pnpm --filter @human-checkpoint/core build && node scripts/build-site-vendor.mjs",
+    "site:serve": "node scripts/serve-site.mjs"
   },
   "devDependencies": {
     "@themoltnet/signer": "0.2.0",

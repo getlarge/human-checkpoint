@@ -66,6 +66,9 @@ export class MoltNetAgentClient {
       pollMs?: number;
       timeoutMs?: number;
       artifactKind?: string;
+      onStatus?: (
+        task: Awaited<ReturnType<Agent['tasks']['get']>>,
+      ) => void | Promise<void>;
     } = {},
   ): Promise<{
     accepted: boolean;
@@ -83,8 +86,13 @@ export class MoltNetAgentClient {
     const startedAt = this.now();
     const pollMs = options.pollMs ?? 2_000;
     const timeoutMs = options.timeoutMs ?? 420_000;
+    let lastStatus = '';
     for (;;) {
       const task = await agent.tasks.get(taskId);
+      if (task.status !== lastStatus) {
+        lastStatus = task.status;
+        await options.onStatus?.(task);
+      }
       if (
         ['completed', 'failed', 'cancelled', 'expired'].includes(task.status)
       ) {

@@ -3,10 +3,9 @@ import { resolve } from 'node:path';
 
 const root = resolve(import.meta.dirname, '..');
 const required = [
-  'public/app.css',
-  'public/app.js',
-  'public/hardware-setup/index.html',
-  'public/technician-briefing/index.html',
+  'templates/request-queue.html',
+  'templates/hardware-setup.html',
+  'templates/technician-workspace.html',
   'flows/flows.json',
   'settings.cjs',
 ];

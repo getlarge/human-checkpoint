@@ -10,7 +10,6 @@ import {
   type CheckpointName,
   type FieldReleasePayload,
   type ResearchAuthorizationPayload,
-  SERVICE_REQUEST_ID,
 } from './types.js';
 
 const ENVELOPE_KEYS = [
@@ -23,23 +22,26 @@ const ENVELOPE_KEYS = [
 
 export function createCheckpointEnvelope(
   checkpoint: 'research-authorization',
+  serviceRequestId: string,
   teamId: string,
   payload: ResearchAuthorizationPayload,
 ): { envelope: CheckpointEnvelope; canonicalMessage: string };
 export function createCheckpointEnvelope(
   checkpoint: 'field-release',
+  serviceRequestId: string,
   teamId: string,
   payload: FieldReleasePayload,
 ): { envelope: CheckpointEnvelope; canonicalMessage: string };
 export function createCheckpointEnvelope(
   checkpoint: CheckpointName,
+  serviceRequestId: string,
   teamId: string,
   payload: Record<string, unknown>,
 ) {
   const envelope: CheckpointEnvelope = {
     v: CHECKPOINT_VERSION,
     checkpoint,
-    serviceRequestId: SERVICE_REQUEST_ID,
+    serviceRequestId,
     teamId,
     payload,
   };
@@ -60,7 +62,8 @@ export function validateCheckpointEnvelope(
   assertExactKeys(envelope, ENVELOPE_KEYS, '$');
   if (
     envelope.v !== CHECKPOINT_VERSION ||
-    envelope.serviceRequestId !== SERVICE_REQUEST_ID ||
+    typeof envelope.serviceRequestId !== 'string' ||
+    !/^SR-[0-9]{3,12}$/.test(envelope.serviceRequestId) ||
     typeof envelope.teamId !== 'string' ||
     envelope.teamId.length === 0
   )

@@ -10,8 +10,8 @@ Organizer deadline shown in the form: **August 6 at 9:00 am PT**.
 - First and last name: `TODO`
 - Email address: `TODO`
 - Project name: `Human Checkpoint`
-- Source code: `TODO: immutable public repository tree URL`
-- Documentation: `TODO: immutable README URL` and `TODO: public demo video`
+- Source code: `TODO: permanent repository permalink after final commit/tag`
+- Documentation: `TODO: permanent README link` and `TODO: public demo video`
 - What did you learn from your project?: use the paste-ready answer below.
 
 ## Title
@@ -22,17 +22,20 @@ Human Checkpoint — Hardware-bound approvals for AI agents
 
 Human Checkpoint lets an AI agent prepare and coordinate field work while
 reserving consequential decisions for a real technician. A single enrolled
-YubiKey 5.8 uses ARKG to produce distinct request-scoped signing keys for a
-public-source check and final work-order release. Node-RED durably orchestrates
-real MoltNet agent tasks, every technician decision binds exact canonical
-bytes, and the completed work order exports an offline-verifiable evidence
-bundle.
+YubiKey 5.8 uses ARKG to produce distinct request-scoped signing keys when the
+technician claims the assigned request and later releases the work order.
+Only after that signed claim does Node-RED start real MoltNet tasks to review
+approved history and prepare the brief. Every technician decision binds exact
+canonical bytes, and the completed work order exports an offline-verifiable
+evidence bundle. Two realistic open requests—including a conveyor case with
+technician-facing reported photos—make the workflow concrete; the agent does
+not analyze image pixels.
 
 ## Links
 
-- Repository permalink: `TODO: final immutable GitHub tree URL`
-- Demo video: `TODO`
-- Tagged source archive: `TODO`
+- Repository permalink: `TODO: final immutable URL`
+- Demo video: `TODO: final public URL`
+- Tagged source archive: `TODO: final archive URL`
 
 ## Learnings
 
@@ -69,9 +72,9 @@ Complete these after the rated submission fields:
 - [ ] Submit before August 6 at 9:00 am PT.
 - [ ] Immutable repository and tagged archive links work while signed out.
 - [ ] Public video is under three minutes and works while signed out.
-- [ ] One physical YubiKey approves the public-source check and work order.
-- [ ] Different derived public keys are visible.
-- [ ] Offline proof succeeds; one-character amendment tamper fails.
+- [x] One physical YubiKey records the request claim and work-order approval.
+- [x] Different derived public keys are visible.
+- [x] Offline proof succeeds; one-character field-note tamper fails.
 - [ ] Clean-checkout README rehearsal succeeds.
 - [ ] Fallback screenshots are captured.
 - [ ] This is the newest and final submission entry.

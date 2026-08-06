@@ -1,0 +1,1855 @@
+<!--
+THESIS: One verified work order, moving from assignment to released evidence; no dashboard-of-cards.
+OWN-WORLD: Light field-service paper, ruled sections, teal workflow, restrained amber only where a YubiKey decision is required.
+STORY: See the assigned machine, follow the agent's preparation, make the two technician decisions, release the work order.
+FIRST VIEWPORT: Request identity and current decision share one horizontal work-order header; the active action is immediately below.
+FORM: A clearance ledger—one continuous operational record with a fixed evidence rail, adapted to a single column on narrow screens.
+-->
+<template>
+  <main class="work-order">
+    <header class="service-bar">
+      <div>
+        <a href="/dashboard/ui/requests" class="back">← Service requests</a>
+        <p class="product">Human Checkpoint</p>
+        <p class="operator-state">
+          Technician workspace · YubiKey checked at each approval
+        </p>
+      </div>
+      <nav aria-label="Workspace links">
+        <a href="/dashboard/ui/hardware-setup">YubiKey setup</a>
+        <a href="/dashboard/node-red/">View workflow</a>
+      </nav>
+    </header>
+
+    <div v-if="error" class="message error" role="alert">
+      <strong>Action stopped.</strong> {{ error }}
+    </div>
+    <div v-else-if="busy" class="message busy" role="status">
+      <strong>Working.</strong> {{ busy }}
+    </div>
+
+    <section v-if="!request.id" class="loading" aria-live="polite">
+      <h1>Loading assigned request</h1>
+      <p>Reading the current work order from Node-RED.</p>
+    </section>
+
+    <template v-else>
+      <header class="request-head">
+        <div class="request-title">
+          <span class="request-id">{{ request.id }}</span>
+          <h1>
+            {{ request.assetName }}
+            <b v-if="showAssetId">{{ request.assetId }}</b>
+          </h1>
+          <p>{{ request.summary }}</p>
+        </div>
+        <dl class="request-facts">
+          <div>
+            <dt>Site</dt>
+            <dd>{{ request.siteName }}</dd>
+          </div>
+          <div>
+            <dt>Priority</dt>
+            <dd>{{ request.priority }}</dd>
+          </div>
+          <div>
+            <dt>Shift</dt>
+            <dd>{{ request.assignedShift }}</dd>
+          </div>
+          <div>
+            <dt>Status</dt>
+            <dd>{{ stateLabel }}</dd>
+          </div>
+        </dl>
+      </header>
+
+      <ol class="progress" aria-label="Work-order progress">
+        <li :data-state="progressState('assigned')">
+          <b>1</b><span>Assigned</span>
+        </li>
+        <li :data-state="progressState('claimed')">
+          <b>2</b><span>Claimed</span>
+        </li>
+        <li :data-state="progressState('brief')">
+          <b>3</b><span>Brief ready</span>
+        </li>
+        <li :data-state="progressState('released')">
+          <b>4</b><span>Released</span>
+        </li>
+      </ol>
+
+      <div class="ledger">
+        <div class="record">
+          <section class="request-detail">
+            <p class="section-label">Reported condition</p>
+            <h2>{{ request.symptom || request.summary }}</h2>
+            <p v-if="request.description">{{ request.description }}</p>
+          </section>
+
+          <section
+            v-if="request.attachments?.length"
+            class="reported-evidence"
+            aria-labelledby="reported-evidence-title"
+          >
+            <header>
+              <div>
+                <p class="section-label">Reported evidence</p>
+                <h2 id="reported-evidence-title">
+                  Photos attached to the request
+                </h2>
+              </div>
+              <span>View only</span>
+            </header>
+            <div class="evidence-gallery">
+              <a
+                v-for="attachment in request.attachments"
+                :key="attachment.id"
+                :href="attachment.url"
+                target="_blank"
+                rel="noreferrer"
+              >
+                <img
+                  :src="attachment.url"
+                  :alt="attachment.altText"
+                  loading="lazy"
+                />
+                <span>
+                  <strong>{{ attachment.label }}</strong>
+                  <small>{{ attachment.id }} · Open full size ↗</small>
+                </span>
+              </a>
+            </div>
+            <p class="evidence-boundary">
+              These synthetic photographs are reported request evidence. The
+              technician can inspect them, but they are not analyzed by the
+              agent and their pixels do not enter the brief.
+            </p>
+          </section>
+
+          <section
+            v-if="canReview || needsTouch"
+            class="decision"
+            aria-labelledby="claim-title"
+          >
+            <p class="section-label">Technician decision</p>
+            <h2 id="claim-title">Claim this assigned request</h2>
+            <p>
+              Claiming confirms that this is your assignment and unlocks the
+              preparation workflow. No service history is reviewed and no AI
+              preparation starts until the signed claim is verified. This does
+              not approve the final work order.
+            </p>
+            <details v-if="journey.research.scope">
+              <summary>What the signed claim permits</summary>
+              <dl class="scope">
+                <div>
+                  <dt>Bounded public check</dt>
+                  <dd>
+                    <ul v-if="scopeQueries.length" class="scope-list">
+                      <li v-for="query in scopeQueries" :key="query">
+                        {{ query }}
+                      </li>
+                    </ul>
+                    <span v-else>Not available</span>
+                  </dd>
+                </div>
+                <div>
+                  <dt>Public sites</dt>
+                  <dd>
+                    <ul v-if="scopeDomains.length" class="scope-list">
+                      <li v-for="domain in scopeDomains" :key="domain.name">
+                        <a :href="domain.url" target="_blank" rel="noreferrer"
+                          >{{ domain.name }} ↗</a
+                        >
+                      </li>
+                    </ul>
+                    <span v-else>Not available</span>
+                  </dd>
+                </div>
+                <div>
+                  <dt>Reason</dt>
+                  <dd>{{ journey.research.scope.reason }}</dd>
+                </div>
+                <div>
+                  <dt>Request</dt>
+                  <dd class="mono">{{ journey.research.requestId }}</dd>
+                </div>
+                <div>
+                  <dt>Team</dt>
+                  <dd class="mono">{{ journey.research.teamId }}</dd>
+                </div>
+                <div>
+                  <dt>Approval method</dt>
+                  <dd>
+                    {{ methodLabel(journey.research.verificationMethod) }}
+                  </dd>
+                </div>
+                <div v-if="journey.research.expiresAt">
+                  <dt>Approval expires</dt>
+                  <dd>{{ time(journey.research.expiresAt) }}</dd>
+                </div>
+              </dl>
+            </details>
+            <div class="actions">
+              <button
+                v-if="canReview"
+                :disabled="Boolean(busy)"
+                @click="act('prepare-assignment', 'Creating the exact request claim. No agent preparation has started.')"
+              >
+                Start request claim
+              </button>
+              <button
+                v-if="needsTouch"
+                class="hardware"
+                :disabled="Boolean(busy)"
+                @click="sign('research')"
+              >
+                Claim request with YubiKey
+              </button>
+            </div>
+          </section>
+
+          <section
+            v-if="claimed && !briefReady"
+            class="preparing"
+            aria-labelledby="prepare-title"
+          >
+            <p class="section-label">Agent preparation</p>
+            <h2 id="prepare-title">Prepare the technician brief</h2>
+            <p>
+              The signed claim is verified. The agent can now review approved
+              same-customer history, perform the bounded public check, and
+              prepare the technician brief.
+            </p>
+            <button
+              :disabled="Boolean(busy)"
+              @click="act('continue-brief', 'The agent is preparing the technician brief.')"
+            >
+              Start preparation
+            </button>
+          </section>
+
+          <article
+            v-if="briefReady"
+            class="brief"
+            aria-labelledby="brief-title"
+          >
+            <header>
+              <div>
+                <p class="section-label">AI-prepared technician brief</p>
+                <h2 id="brief-title">
+                  {{ journey.brief.title || 'Ready for field review' }}
+                </h2>
+              </div>
+              <span class="locked">Read-only</span>
+            </header>
+            <p class="brief-summary">{{ journey.brief.requestSummary }}</p>
+            <div class="brief-grid">
+              <section>
+                <h3>What the sources say</h3>
+                <ul>
+                  <li v-for="item in journey.brief.findings" :key="item">
+                    {{ item }}
+                  </li>
+                </ul>
+              </section>
+              <section>
+                <h3>Questions for the site visit</h3>
+                <ul>
+                  <li
+                    v-for="item in journey.brief.questionsToCheck"
+                    :key="item"
+                  >
+                    {{ item }}
+                  </li>
+                </ul>
+              </section>
+              <section>
+                <h3>Still unknown</h3>
+                <ul>
+                  <li v-for="item in journey.brief.unknowns" :key="item">
+                    {{ item }}
+                  </li>
+                </ul>
+              </section>
+            </div>
+          </article>
+
+          <section
+            v-if="briefReady && journey.workflow.state !== 'released'"
+            class="decision"
+            aria-labelledby="release-title"
+          >
+            <p class="section-label">Final technician decision</p>
+            <h2 id="release-title">Release the completed work order</h2>
+            <p>
+              Add what you observed in the field. The note becomes part of the
+              exact work order you approve and cannot be edited afterward.
+            </p>
+            <label for="field-note">Field note (required)</label>
+            <textarea
+              id="field-note"
+              v-model="note"
+              rows="5"
+              :disabled="releaseLocked"
+              maxlength="2000"
+              placeholder="Record the observation or condition that must travel with this work order."
+            ></textarea>
+            <details v-if="releaseLocked">
+              <summary>Review the locked work order</summary>
+              <dl class="scope">
+                <div>
+                  <dt>Field note</dt>
+                  <dd>{{ releasePayload.fieldAmendment }}</dd>
+                </div>
+                <div>
+                  <dt>Disposition</dt>
+                  <dd>Accepted with field note</dd>
+                </div>
+                <div>
+                  <dt>Role and shift</dt>
+                  <dd>
+                    {{ releasePayload.role }} · {{ releasePayload.shift }}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Request</dt>
+                  <dd class="mono">{{ journey.release.requestId }}</dd>
+                </div>
+                <div>
+                  <dt>Team</dt>
+                  <dd class="mono">{{ journey.release.teamId }}</dd>
+                </div>
+                <div>
+                  <dt>Approval method</dt>
+                  <dd>{{ methodLabel(journey.release.verificationMethod) }}</dd>
+                </div>
+                <div>
+                  <dt>Approval expires</dt>
+                  <dd>{{ time(journey.release.expiresAt) }}</dd>
+                </div>
+              </dl>
+            </details>
+            <div class="actions">
+              <button
+                v-if="!releaseLocked"
+                :disabled="!note.trim() || Boolean(busy)"
+                @click="act('prepare-release', 'Locking the work order for your approval.', { fieldAmendment: note.trim(), role: request.assignedRole, shift: request.assignedShift })"
+              >
+                Lock work order for approval
+              </button>
+              <button
+                v-if="releaseLocked && releaseStatus !== 'completed'"
+                class="hardware"
+                :disabled="Boolean(busy)"
+                @click="sign('release')"
+              >
+                Approve work order with YubiKey
+              </button>
+              <button
+                v-if="releaseStatus === 'completed'"
+                :disabled="Boolean(busy)"
+                @click="act('finalize-release', 'Verifying and releasing the approved work order.')"
+              >
+                Release approved work order
+              </button>
+            </div>
+          </section>
+
+          <section
+            v-if="journey.workflow.state === 'released'"
+            class="released"
+          >
+            <p class="section-label">Portable approval record</p>
+            <h2>Work order released</h2>
+            <p>
+              Both approvals are bound to this request. The exported record can
+              be verified without MoltNet, the companion, or the YubiKey.
+            </p>
+            <p v-if="!verification">
+              <strong>Verifying what the technician approved…</strong>
+            </p>
+            <button
+              v-if="!proof && !proofRequested"
+              :disabled="Boolean(busy)"
+              @click="ensureProof"
+            >
+              Build and verify approval record
+            </button>
+            <div
+              v-if="verification"
+              class="verification"
+              :data-status="verification.valid ? 'valid' : 'invalid'"
+              role="status"
+            >
+              <strong>{{ verificationLabel }}</strong>
+              <p v-if="verification.valid && verification.keysDiffer">
+                Both decisions have valid YubiKey signatures over the exact
+                approved record. The record is ready to download and verify
+                offline.
+              </p>
+              <p v-else-if="!verification.valid">{{ verificationErrors }}</p>
+            </div>
+
+            <details v-if="proof" class="manager-evidence">
+              <summary>
+                <span>
+                  <small>Team manager</small>
+                  <strong>Inspect signatures and offline receipts</strong>
+                </span>
+                <span>{{ verifiedReceiptCount }}/2 verified</span>
+              </summary>
+              <div class="manager-evidence-body">
+                <header>
+                  <div>
+                    <p class="section-label">Technical evidence</p>
+                    <h3>Two signed decisions, one portable record</h3>
+                  </div>
+                  <span
+                    class="receipt-state"
+                    :data-status="verification?.valid ? 'valid' : 'invalid'"
+                  >
+                    {{ verification?.valid ? 'Valid' : 'Needs attention' }}
+                  </span>
+                </header>
+                <p>
+                  This section exposes claimant, credential, exact signed bytes,
+                  and request-scoped keys for team-manager review. It is
+                  evidence of two decisions, not a second-factor login receipt.
+                </p>
+
+                <ol class="receipts">
+                  <li v-for="item in approvalReceipts" :key="item.checkpoint">
+                    <div>
+                      <strong>{{ item.title }}</strong>
+                      <small>{{ approvalStatus(item.approval) }}</small>
+                    </div>
+                    <span
+                      class="receipt-mark"
+                      :data-status="receiptStatus(item)"
+                      aria-hidden="true"
+                    ></span>
+                    <p
+                      class="receipt-result"
+                      :data-status="receiptStatus(item)"
+                    >
+                      {{ receiptVerificationLabel(item) }}
+                    </p>
+                    <p
+                      v-if="item.approval.derivedPublicKey"
+                      class="key-summary"
+                    >
+                      Request-scoped key
+                      <code
+                        >{{ keyFingerprint(item.approval.derivedPublicKey)
+                        }}</code
+                      >
+                    </p>
+                    <p v-if="item.check?.errors?.length" class="receipt-errors">
+                      {{ item.check.errors.join(' · ') }}
+                    </p>
+                    <details v-if="item.approval.canonicalMessage">
+                      <summary>Inspect signed bytes and key</summary>
+                      <dl class="scope">
+                        <div>
+                          <dt>Purpose</dt>
+                          <dd>{{ item.approval.purpose }}</dd>
+                        </div>
+                        <div>
+                          <dt>Signing request</dt>
+                          <dd class="mono">{{ item.approval.requestId }}</dd>
+                        </div>
+                        <div v-if="item.approval.completedAt">
+                          <dt>Completed</dt>
+                          <dd>{{ time(item.approval.completedAt) }}</dd>
+                        </div>
+                        <div v-if="item.approval.credentialId">
+                          <dt>Enrolled credential</dt>
+                          <dd class="mono">{{ item.approval.credentialId }}</dd>
+                        </div>
+                        <div v-if="item.approval.derivedPublicKey">
+                          <dt>Derived public key</dt>
+                          <dd class="mono">
+                            {{ keyLabel(item.approval.derivedPublicKey) }}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt>Exact canonical message</dt>
+                          <dd class="canonical mono">
+                            {{ item.approval.canonicalMessage }}
+                          </dd>
+                        </div>
+                      </dl>
+                    </details>
+                  </li>
+                </ol>
+
+                <section
+                  v-if="verification"
+                  class="key-comparison"
+                  :data-status="verification.keysDiffer ? 'valid' : 'invalid'"
+                  aria-labelledby="key-comparison-title"
+                >
+                  <div>
+                    <p class="section-label">Request-scoped key separation</p>
+                    <h3 id="key-comparison-title">{{ keyComparisonLabel }}</h3>
+                  </div>
+                  <dl class="keys">
+                    <div
+                      v-for="check in verification.checkpoints"
+                      :key="check.requestId || check.checkpoint"
+                    >
+                      <dt>{{ checkpointLabel(check.checkpoint) }}</dt>
+                      <dd class="mono">
+                        {{ keyFingerprintValue(check.derivedPublicKey) }}
+                      </dd>
+                    </div>
+                  </dl>
+                </section>
+
+                <div class="proof-integrity">
+                  <strong>Portable record integrity</strong>
+                  <span v-if="verification?.proofHashValid"
+                    >✓ Proof hash verified</span
+                  >
+                  <span v-else>✕ Proof hash failed</span>
+                </div>
+
+                <div v-if="verification?.valid" class="actions">
+                  <button @click="download(proof)">
+                    Download verified record
+                  </button>
+                  <button
+                    class="hardware"
+                    :disabled="Boolean(busy)"
+                    @click="verifyTampered"
+                  >
+                    Change one character and verify again
+                  </button>
+                </div>
+                <p class="tamper-explainer">
+                  The tamper check changes one character in a copy of the field
+                  note. The released work order is not modified.
+                </p>
+                <p
+                  v-if="tamperReport"
+                  class="tamper"
+                  :data-status="tamperReport.valid ? 'invalid' : 'valid'"
+                  role="status"
+                >
+                  {{ tamperLabel }}
+                </p>
+              </div>
+            </details>
+          </section>
+        </div>
+
+        <aside
+          class="activity"
+          aria-labelledby="activity-title"
+          aria-live="polite"
+        >
+          <div>
+            <p class="section-label">MoltNet agent activity</p>
+            <h2 id="activity-title">Preparation tasks</h2>
+          </div>
+          <ol v-if="journey.tasks.length">
+            <li v-for="task in journey.tasks" :key="task.taskId">
+              <span :data-status="task.status" aria-hidden="true"></span>
+              <div>
+                <strong>{{ taskName(task.taskRole) }}</strong>
+                <small>{{ task.status }} · attempt {{ task.attempt }}</small>
+                <small class="mono">{{ task.taskId }}</small>
+              </div>
+            </li>
+          </ol>
+          <p v-else class="empty">No agent task has started.</p>
+          <button
+            class="refresh"
+            :disabled="Boolean(busy)"
+            @click="load(false)"
+          >
+            Refresh status
+          </button>
+        </aside>
+      </div>
+    </template>
+  </main>
+</template>
+
+<script>
+  export default {
+    data() {
+      return {
+        journey: {
+          supportRequest: {},
+          workflow: { state: 'loading' },
+          tasks: [],
+          research: { status: 'not-requested', scope: null },
+          release: { status: 'not-requested' },
+          brief: {
+            immutable: false,
+            findings: [],
+            questionsToCheck: [],
+            unknowns: [],
+          },
+        },
+        busy: '',
+        error: '',
+        note: '',
+        credential: null,
+        signerUrl: '',
+        signerToken: '',
+        refreshTimer: null,
+        proof: null,
+        proofRequested: false,
+        verification: null,
+        tamperReport: null,
+        verificationMode: 'original',
+      };
+    },
+    computed: {
+      request() {
+        return this.journey.supportRequest || {};
+      },
+      showAssetId() {
+        const name =
+          typeof this.request.assetName === 'string'
+            ? this.request.assetName.toLocaleLowerCase()
+            : '';
+        const id =
+          typeof this.request.assetId === 'string'
+            ? this.request.assetId.trim().toLocaleLowerCase()
+            : '';
+        return Boolean(id && !name.includes(id));
+      },
+      workflowId() {
+        return (
+          new URLSearchParams(location.hash.slice(1)).get('workflow') || ''
+        );
+      },
+      claimed() {
+        return this.journey.research.status === 'completed';
+      },
+      canReview() {
+        if (this.briefReady) return false;
+        const approvalStatus = this.journey.research.status;
+        if (['expired', 'rejected'].includes(approvalStatus)) return true;
+        return (
+          ['assigned', 'preparing'].includes(this.journey.workflow.state) &&
+          approvalStatus === 'not-requested'
+        );
+      },
+      needsTouch() {
+        return (
+          !this.briefReady &&
+          ['pending', 'claimed'].includes(this.journey.research.status)
+        );
+      },
+      briefReady() {
+        return Boolean(this.journey.brief.immutable);
+      },
+      releaseStatus() {
+        return this.journey.release.status || 'not-requested';
+      },
+      releaseLocked() {
+        return ['pending', 'claimed', 'completed'].includes(this.releaseStatus);
+      },
+      releasePayload() {
+        return this.envelope(this.journey.release).payload || {};
+      },
+      verificationLabel() {
+        return this.verification?.valid
+          ? '✓ Approval record valid'
+          : '✕ Approval record invalid';
+      },
+      verificationErrors() {
+        const reportErrors = Array.isArray(this.verification?.errors)
+          ? this.verification.errors
+          : [];
+        const receiptErrors = Array.isArray(this.verification?.checkpoints)
+          ? this.verification.checkpoints.flatMap((item) =>
+              Array.isArray(item?.errors) ? item.errors : [],
+            )
+          : [];
+        const errors = [...reportErrors, ...receiptErrors];
+        return (
+          errors.length ? errors : ['The approval record is invalid.']
+        ).join(' · ');
+      },
+      tamperLabel() {
+        return this.tamperReport?.valid
+          ? 'Unexpected: changed record passed.'
+          : '✓ Tamper detected: the changed field note fails offline verification.';
+      },
+      approvalReceipts() {
+        const checks = Array.isArray(this.verification?.checkpoints)
+          ? this.verification.checkpoints
+          : [];
+        return [
+          {
+            checkpoint: 'research-authorization',
+            title: 'Request claim',
+            approval: this.journey.research,
+            check: checks.find(
+              (item) => item.checkpoint === 'research-authorization',
+            ),
+          },
+          {
+            checkpoint: 'field-release',
+            title: 'Work-order release',
+            approval: this.journey.release,
+            check: checks.find((item) => item.checkpoint === 'field-release'),
+          },
+        ];
+      },
+      verifiedReceiptCount() {
+        return this.approvalReceipts.filter((item) => item.check?.valid).length;
+      },
+      scopeQueries() {
+        return this.journey.research.scope?.queries || [];
+      },
+      scopeDomains() {
+        return (this.journey.research.scope?.allowedDomains || []).map(
+          (name) => ({ name, url: `https://${name}/` }),
+        );
+      },
+      sameKeySeparated() {
+        const first = this.journey.research;
+        const second = this.journey.release;
+        return Boolean(
+          first.credentialId &&
+          first.credentialId === second.credentialId &&
+          first.derivedPublicKey &&
+          second.derivedPublicKey &&
+          JSON.stringify(first.derivedPublicKey) !==
+            JSON.stringify(second.derivedPublicKey),
+        );
+      },
+      keyComparisonLabel() {
+        if (!this.verification?.keysDiffer)
+          return 'Key separation not verified';
+        return this.sameKeySeparated
+          ? 'Same enrolled YubiKey, two different action keys'
+          : 'Two different request-scoped action keys verified';
+      },
+      stateLabel() {
+        if (this.briefReady && this.releaseStatus === 'expired')
+          return 'Approval expired — renew';
+        if (this.briefReady && this.releaseStatus === 'rejected')
+          return 'Approval rejected — revise and renew';
+        const labels = {
+          assigned: 'Assigned',
+          preparing: 'Assigned',
+          'waiting-for-public-source-approval': 'Waiting for request claim',
+          researching: 'Preparing brief',
+          'brief-ready': 'Brief ready',
+          'waiting-for-release-approval': 'Waiting for work-order approval',
+          released: 'Released',
+          error: 'Needs attention',
+        };
+        return (
+          labels[this.journey.workflow.state] || this.journey.workflow.state
+        );
+      },
+    },
+    mounted() {
+      this.load(false);
+      this.refreshTimer = window.setInterval(() => this.load(true), 3000);
+    },
+    beforeUnmount() {
+      if (this.refreshTimer) window.clearInterval(this.refreshTimer);
+    },
+    methods: {
+      applyJourney(value) {
+        const j = value || {};
+        const brief = j.brief || {};
+        this.journey = {
+          supportRequest: j.supportRequest || {},
+          workflow: {
+            ...(j.workflow || {}),
+            state: j.workflow?.state || 'loading',
+          },
+          tasks: Array.isArray(j.tasks) ? j.tasks : [],
+          research: {
+            ...(j.research || {}),
+            status: j.research?.status || 'not-requested',
+            scope: j.research?.scope
+              ? {
+                  ...j.research.scope,
+                  queries: Array.isArray(j.research.scope.queries)
+                    ? this.safeTextList(j.research.scope.queries)
+                    : [],
+                  allowedDomains: Array.isArray(j.research.scope.allowedDomains)
+                    ? j.research.scope.allowedDomains
+                        .map((item) => this.safeDomain(item))
+                        .filter(Boolean)
+                    : [],
+                  reason:
+                    typeof j.research.scope.reason === 'string'
+                      ? j.research.scope.reason.slice(0, 1000)
+                      : 'Not available',
+                }
+              : null,
+          },
+          release: j.release || { status: 'not-requested' },
+          brief: {
+            ...brief,
+            immutable: Boolean(brief.immutable),
+            findings: Array.isArray(brief.findings) ? brief.findings : [],
+            questionsToCheck: Array.isArray(brief.questionsToCheck)
+              ? brief.questionsToCheck
+              : [],
+            unknowns: Array.isArray(brief.unknowns) ? brief.unknowns : [],
+          },
+        };
+        if (this.journey.release.fieldAmendment && !this.note)
+          this.note = this.journey.release.fieldAmendment;
+      },
+      async requestJson(url, init = {}) {
+        const response = await fetch(url, {
+          credentials: 'same-origin',
+          ...init,
+          headers: {
+            accept: 'application/json',
+            ...(init.body ? { 'content-type': 'application/json' } : {}),
+          },
+        });
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok)
+          throw new Error(
+            body.detail ||
+              body.error ||
+              `Request failed with HTTP ${response.status}`,
+          );
+        return body;
+      },
+      async load(quiet = false) {
+        if (!this.workflowId) {
+          this.error = 'Open a request from the service request queue.';
+          return;
+        }
+        try {
+          this.applyJourney(
+            await this.requestJson(
+              `/dashboard/api/workflow?workflow=${encodeURIComponent(this.workflowId)}`,
+            ),
+          );
+          if (!quiet) this.error = '';
+          if (
+            this.journey.workflow.state === 'released' &&
+            !this.proof &&
+            !this.proofRequested
+          )
+            await this.ensureProof();
+        } catch (error) {
+          if (!quiet)
+            this.error = error instanceof Error ? error.message : String(error);
+        }
+      },
+      async act(action, message, payload = {}) {
+        this.error = '';
+        this.busy = message;
+        try {
+          const result = await this.requestJson(
+            '/dashboard/api/workflow/action',
+            {
+              method: 'POST',
+              body: JSON.stringify({
+                action,
+                workflowId: this.workflowId,
+                payload,
+              }),
+            },
+          );
+          if (result.kind === 'proof') {
+            this.proof = result.proof;
+            this.verification = null;
+            this.tamperReport = null;
+            this.verificationMode = 'original';
+            await this.act(
+              'verify-proof',
+              'Checking the approval record offline.',
+              result.proof,
+            );
+          } else if (result.kind === 'verification') {
+            if (this.verificationMode === 'tampered') {
+              this.tamperReport = result.report;
+            } else {
+              this.verification = result.report;
+            }
+            if (!result.report?.valid && this.verificationMode !== 'tampered')
+              this.error = (
+                result.report?.errors || ['The approval record is invalid.']
+              ).join(' · ');
+          } else {
+            this.applyJourney(result);
+            if (
+              this.journey.workflow.state === 'released' &&
+              !this.proof &&
+              !this.proofRequested
+            )
+              await this.ensureProof();
+          }
+        } catch (error) {
+          this.error = error instanceof Error ? error.message : String(error);
+        } finally {
+          this.busy = '';
+        }
+      },
+      async signer(path, init = {}, auth = true) {
+        const response = await fetch(new URL(path, this.signerUrl), {
+          ...init,
+          credentials: 'omit',
+          redirect: 'error',
+          headers: {
+            accept: 'application/json',
+            ...(init.body ? { 'content-type': 'application/json' } : {}),
+            ...(auth && this.signerToken
+              ? { 'x-moltnet-signer-session': this.signerToken }
+              : {}),
+          },
+        });
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok)
+          throw new Error(
+            body.message || `Signer returned HTTP ${response.status}`,
+          );
+        return body;
+      },
+      async prepareSigner() {
+        const config = await this.requestJson('/dashboard/api/config');
+        const url = new URL(config.signerUrl);
+        if (
+          url.protocol !== 'http:' ||
+          !['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname)
+        )
+          throw new Error('Signer companion must use a loopback URL.');
+        this.signerUrl = config.signerUrl;
+        this.signerToken = (
+          await this.signer('/v1/sessions', { method: 'POST' }, false)
+        ).token;
+        const list = await this.requestJson(
+          '/dashboard/api/signing/crypto/signing-credentials?limit=100',
+        );
+        this.credential =
+          (list.items || []).find((item) => item.status === 'active') || null;
+        if (!this.credential)
+          throw new Error(
+            'Activate a YubiKey credential before approving this work.',
+          );
+      },
+      async sign(kind) {
+        const approval = this.journey[kind];
+        if (!approval?.requestId) {
+          this.error = 'Prepare this technician decision first.';
+          return;
+        }
+        const popup = window.open(
+          'about:blank',
+          'human-checkpoint-signer',
+          'popup,width=600,height=760',
+        );
+        this.busy = 'Waiting for the YubiKey touch.';
+        this.error = '';
+        try {
+          if (!this.credential || !this.signerToken) await this.prepareSigner();
+          const claim = await this.requestJson(
+            `/dashboard/api/signing/crypto/signing-requests/${approval.requestId}/claim`,
+            {
+              method: 'POST',
+              body: JSON.stringify({ credentialId: this.credential.id }),
+            },
+          );
+          const ceremony = await this.signer('/v1/ceremonies', {
+            method: 'POST',
+            body: JSON.stringify({
+              version: 1,
+              operation: 'signing-request',
+              resourceId: claim.id,
+              challenge: claim.challenge,
+            }),
+          });
+          if (!popup || popup.closed)
+            throw new Error('Allow the signer approval popup, then try again.');
+          popup.location.replace(ceremony.approvalUrl);
+          let result = { status: 'pending' };
+          for (
+            let attempt = 0;
+            attempt < 600 && result.status === 'pending';
+            attempt += 1
+          ) {
+            await new Promise((resolve) => setTimeout(resolve, 500));
+            result = await this.signer(`/v1/ceremonies/${ceremony.id}/result`, {
+              method: 'GET',
+            });
+          }
+          if (result.status !== 'completed')
+            throw new Error(
+              result.message || 'The YubiKey approval did not complete.',
+            );
+          await this.requestJson(
+            `/dashboard/api/signing/crypto/signing-requests/${approval.requestId}/complete`,
+            {
+              method: 'POST',
+              body: JSON.stringify({ receipt: result.receipt }),
+            },
+          );
+          await this.act(
+            kind === 'research' ? 'continue-brief' : 'finalize-release',
+            kind === 'research'
+              ? 'The agent is preparing the technician brief.'
+              : 'Verifying and releasing the approved work order.',
+          );
+        } catch (error) {
+          this.error = error instanceof Error ? error.message : String(error);
+        } finally {
+          this.busy = '';
+          popup?.close();
+        }
+      },
+      progressState(step) {
+        const state = this.journey.workflow.state;
+        const completed = {
+          assigned: true,
+          claimed: [
+            'researching',
+            'brief-ready',
+            'waiting-for-release-approval',
+            'released',
+          ].includes(state),
+          brief: [
+            'brief-ready',
+            'waiting-for-release-approval',
+            'released',
+          ].includes(state),
+          released: state === 'released',
+        };
+        if (completed[step]) return 'complete';
+        const current =
+          (step === 'claimed' &&
+            ['waiting-for-public-source-approval'].includes(state)) ||
+          (step === 'brief' && state === 'researching') ||
+          (step === 'released' && state === 'waiting-for-release-approval');
+        return current ? 'current' : 'waiting';
+      },
+      taskName(role) {
+        const labels = {
+          'request-review': 'Review request and service history',
+          'technician-brief': 'Prepare technician brief',
+        };
+        return (
+          labels[role] || String(role || 'Agent task').replaceAll('-', ' ')
+        );
+      },
+      safeTextList(value) {
+        return value
+          .filter((item) => typeof item === 'string')
+          .map((item) => item.trim().slice(0, 500))
+          .filter(Boolean)
+          .slice(0, 20);
+      },
+      safeDomain(value) {
+        if (typeof value !== 'string') return null;
+        const domain = value.trim().toLowerCase();
+        if (
+          domain.length > 253 ||
+          !/^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/.test(
+            domain,
+          )
+        )
+          return null;
+        return domain;
+      },
+      envelope(approval) {
+        try {
+          const value = JSON.parse(approval?.canonicalMessage || '{}');
+          return value && typeof value === 'object' ? value : {};
+        } catch {
+          return {};
+        }
+      },
+      methodLabel(method) {
+        return method === 'human-hardware-previewsign'
+          ? 'YubiKey request-scoped signing'
+          : method || 'Not available';
+      },
+      checkpointLabel(checkpoint) {
+        return checkpoint === 'research-authorization'
+          ? 'Request claim'
+          : 'Work-order release';
+      },
+      keyLabel(key) {
+        if (!key) return 'Not available';
+        return typeof key === 'string' ? key : JSON.stringify(key);
+      },
+      keyFingerprint(key) {
+        if (!key || typeof key !== 'object') return 'Not available';
+        const x = String(key.x || '');
+        const y = String(key.y || '');
+        if (!x || !y) return 'Not available';
+        return `${x.slice(0, 8)}…${y.slice(-8)}`;
+      },
+      keyFingerprintValue(key) {
+        if (typeof key !== 'string') return 'Not available';
+        try {
+          return this.keyFingerprint(JSON.parse(key));
+        } catch {
+          return 'Not available';
+        }
+      },
+      receiptStatus(item) {
+        if (!item.check) return 'pending';
+        return item.check.valid ? 'valid' : 'invalid';
+      },
+      receiptVerificationLabel(item) {
+        if (!item.check) return 'Waiting for offline verification';
+        return item.check.valid
+          ? '✓ Signature and exact signed bytes verified'
+          : '✕ Offline verification failed';
+      },
+      approvalStatus(approval) {
+        const labels = {
+          'not-requested': 'Not signed',
+          pending: 'Waiting for technician',
+          claimed: 'YubiKey touch in progress',
+          completed: 'Signed',
+          rejected: 'Rejected',
+          expired: 'Expired',
+        };
+        return (
+          labels[approval?.status] || String(approval?.status || 'Unknown')
+        );
+      },
+      async ensureProof() {
+        if (this.proof || this.proofRequested) return;
+        this.proofRequested = true;
+        try {
+          await this.act(
+            'export-proof',
+            'Building and checking the portable approval record.',
+          );
+        } finally {
+          if (!this.proof) this.proofRequested = false;
+        }
+      },
+      async verifyTampered() {
+        try {
+          const changed = JSON.parse(JSON.stringify(this.proof));
+          const release = changed?.checkpoints?.find(
+            (item) => item.checkpoint === 'field-release',
+          );
+          const marker = '"fieldAmendment":"';
+          const start = release?.canonicalMessage?.indexOf(marker) ?? -1;
+          const index = start + marker.length;
+          if (start < 0 || index >= release.canonicalMessage.length)
+            throw new Error('The approval record has no field note to change.');
+          const current = release.canonicalMessage[index];
+          release.canonicalMessage =
+            release.canonicalMessage.slice(0, index) +
+            (current === 'X' ? 'Y' : 'X') +
+            release.canonicalMessage.slice(index + 1);
+          this.verificationMode = 'tampered';
+          await this.act(
+            'verify-proof',
+            'Checking the one-character field-note change offline.',
+            changed,
+          );
+        } catch (error) {
+          this.error = error instanceof Error ? error.message : String(error);
+        }
+      },
+      time(value) {
+        return new Intl.DateTimeFormat(undefined, {
+          dateStyle: 'medium',
+          timeStyle: 'short',
+        }).format(new Date(value));
+      },
+      download(proof) {
+        const url = URL.createObjectURL(
+          new Blob([JSON.stringify(proof, null, 2)], {
+            type: 'application/json',
+          }),
+        );
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `${this.request.id || 'work-order'}-approval-record.json`;
+        link.click();
+        URL.revokeObjectURL(url);
+      },
+    },
+  };
+</script>
+
+<style>
+  .work-order {
+    --ink: #14211f;
+    --muted: #536763;
+    --rule: #c9d5d2;
+    --paper: #fff;
+    --canvas: #f3f6f5;
+    --teal: #087f78;
+    --teal-dark: #05645f;
+    --amber: #9b5b07;
+    --amber-bg: #fff1d6;
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 28px;
+    color: var(--ink);
+    font-family: 'Avenir Next', Avenir, 'Segoe UI', sans-serif;
+  }
+  .service-bar,
+  .request-head,
+  .ledger,
+  .brief header,
+  .actions {
+    display: flex;
+  }
+  .service-bar {
+    justify-content: space-between;
+    align-items: flex-start;
+    padding-bottom: 18px;
+  }
+  .service-bar nav {
+    display: flex;
+    gap: 18px;
+  }
+  .service-bar a,
+  .back {
+    color: var(--teal-dark);
+    font-weight: 700;
+    text-decoration: none;
+  }
+  .back {
+    display: block;
+    margin-bottom: 16px;
+    font-size: 0.875rem;
+  }
+  .product,
+  .section-label {
+    margin: 0 0 5px;
+    color: var(--teal-dark);
+    font-size: 0.875rem;
+    font-weight: 750;
+  }
+  .operator-state {
+    margin: 3px 0 0;
+    color: var(--muted);
+    font-size: 0.78rem;
+  }
+  .request-head {
+    justify-content: space-between;
+    gap: 32px;
+    padding: 26px 0;
+    border-top: 1px solid var(--rule);
+    border-bottom: 1px solid var(--rule);
+  }
+  .request-id {
+    color: var(--teal-dark);
+    font-weight: 800;
+  }
+  .work-order h1 {
+    max-width: 24ch;
+    margin: 6px 0 8px;
+    font-size: clamp(1.8rem, 4vw, 2.6rem);
+    line-height: 1.08;
+    letter-spacing: -0.025em;
+    text-wrap: balance;
+  }
+  .work-order h1 b {
+    font-weight: 500;
+    color: var(--muted);
+  }
+  .request-title > p,
+  .request-detail > p,
+  .decision > p,
+  .preparing > p,
+  .released > p,
+  .brief-summary {
+    max-width: 70ch;
+    color: var(--muted);
+    line-height: 1.55;
+  }
+  .request-facts {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(130px, 1fr));
+    gap: 12px 28px;
+    min-width: 360px;
+    margin: 0;
+  }
+  .work-order dt {
+    color: var(--muted);
+    font-size: 0.78rem;
+  }
+  .work-order dd {
+    margin: 3px 0 0;
+    font-weight: 700;
+  }
+  .progress {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    list-style: none;
+    margin: 0;
+    padding: 18px 0;
+    border-bottom: 1px solid var(--rule);
+  }
+  .progress li {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    color: var(--muted);
+    font-size: 0.875rem;
+  }
+  .progress b {
+    display: grid;
+    place-items: center;
+    width: 25px;
+    height: 25px;
+    border: 1px solid var(--rule);
+    border-radius: 50%;
+  }
+  .progress li[data-state='complete'] {
+    color: var(--teal-dark);
+  }
+  .progress li[data-state='complete'] b {
+    border-color: var(--teal);
+    background: var(--teal);
+    color: #fff;
+  }
+  .progress li[data-state='current'] {
+    color: var(--ink);
+    font-weight: 750;
+  }
+  .progress li[data-state='current'] b {
+    border-color: var(--amber);
+    background: var(--amber-bg);
+    color: var(--amber);
+  }
+  .ledger {
+    align-items: flex-start;
+    gap: 42px;
+    padding-top: 28px;
+  }
+  .record {
+    min-width: 0;
+    flex: 1;
+    background: var(--paper);
+    box-shadow: 0 10px 28px rgba(20, 33, 31, 0.08);
+  }
+  .record > section,
+  .record > article {
+    padding: 26px 30px;
+    border-bottom: 1px solid var(--rule);
+  }
+  .reported-evidence header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 18px;
+  }
+  .reported-evidence header > span {
+    padding: 5px 8px;
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+    color: var(--muted);
+    font-size: 0.75rem;
+    font-weight: 700;
+  }
+  .evidence-gallery {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+    margin-top: 16px;
+  }
+  .evidence-gallery a {
+    overflow: hidden;
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    color: var(--ink);
+    text-decoration: none;
+  }
+  .evidence-gallery img {
+    display: block;
+    width: 100%;
+    aspect-ratio: 4 / 3;
+    object-fit: cover;
+  }
+  .evidence-gallery a > span {
+    display: block;
+    padding: 10px 12px 12px;
+  }
+  .evidence-gallery strong,
+  .evidence-gallery small {
+    display: block;
+  }
+  .evidence-gallery small {
+    margin-top: 3px;
+    color: var(--muted);
+  }
+  .evidence-boundary {
+    max-width: 72ch;
+    margin: 14px 0 0;
+    color: var(--muted);
+    font-size: 0.82rem;
+    line-height: 1.5;
+  }
+  .work-order h2 {
+    margin: 4px 0 10px;
+    font-size: 1.35rem;
+    line-height: 1.25;
+  }
+  .work-order h3 {
+    margin: 0 0 10px;
+    font-size: 1rem;
+  }
+  .decision {
+    background: #fffaf0;
+    box-shadow: inset 1px 0 0 var(--amber);
+  }
+  .work-order details {
+    margin-top: 18px;
+    padding-top: 14px;
+    border-top: 1px solid #ead2aa;
+  }
+  .work-order summary {
+    cursor: pointer;
+    color: var(--amber);
+    font-weight: 750;
+  }
+  .scope {
+    display: grid;
+    gap: 12px;
+    margin: 16px 0 0;
+  }
+  .scope-list {
+    margin: 0 !important;
+    padding-left: 18px !important;
+  }
+  .scope-list a {
+    color: var(--teal-dark);
+  }
+  .actions {
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 20px;
+  }
+  .work-order button {
+    min-height: 44px;
+    border: 1px solid var(--teal);
+    border-radius: 6px;
+    padding: 10px 16px;
+    background: var(--teal);
+    color: #fff;
+    font: inherit;
+    font-weight: 750;
+    cursor: pointer;
+  }
+  .work-order button:hover {
+    background: var(--teal-dark);
+  }
+  .work-order button:disabled {
+    cursor: not-allowed;
+    opacity: 0.52;
+  }
+  .work-order button.hardware {
+    border-color: var(--amber);
+    background: var(--amber-bg);
+    color: #6e4105;
+  }
+  .work-order button.hardware:hover {
+    background: #f8dfb5;
+  }
+  .work-order textarea {
+    box-sizing: border-box;
+    width: 100%;
+    margin-top: 8px;
+    padding: 12px;
+    border: 1px solid #8fa39f;
+    border-radius: 6px;
+    background: #fff;
+    color: var(--ink);
+    font: inherit;
+    line-height: 1.5;
+    resize: vertical;
+  }
+  .work-order label {
+    display: block;
+    margin-top: 18px;
+    font-weight: 750;
+  }
+  .brief header {
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 18px;
+  }
+  .locked {
+    padding: 5px 9px;
+    border-radius: 999px;
+    background: #e9efed;
+    color: var(--muted);
+    font-size: 0.75rem;
+    font-weight: 750;
+  }
+  .brief-grid {
+    display: grid;
+    grid-template-columns: 1.25fr 1fr 1fr;
+    gap: 0;
+    margin-top: 24px;
+    border-top: 1px solid var(--rule);
+  }
+  .brief-grid section {
+    padding: 20px 20px 0 0;
+  }
+  .brief-grid section + section {
+    padding-left: 20px;
+    border-left: 1px solid var(--rule);
+  }
+  .work-order ul {
+    margin: 0;
+    padding-left: 19px;
+  }
+  .work-order li + li {
+    margin-top: 8px;
+  }
+  .work-order li {
+    line-height: 1.45;
+  }
+  .activity {
+    width: 320px;
+    position: sticky;
+    top: 24px;
+    padding: 20px 0;
+    border-top: 2px solid var(--ink);
+    border-bottom: 1px solid var(--rule);
+  }
+  .activity ol {
+    list-style: none;
+    margin: 18px 0;
+    padding: 0;
+  }
+  .activity li {
+    display: flex;
+    gap: 11px;
+    padding: 13px 0;
+    border-top: 1px solid var(--rule);
+  }
+  .activity li > span {
+    flex: 0 0 auto;
+    width: 9px;
+    height: 9px;
+    margin-top: 5px;
+    border-radius: 50%;
+    background: #9aa9a6;
+  }
+  .activity li > span[data-status='completed'] {
+    background: var(--teal);
+  }
+  .activity li > span[data-status='running'],
+  .activity li > span[data-status='claimed'] {
+    background: var(--amber);
+  }
+  .activity strong,
+  .activity small {
+    display: block;
+  }
+  .activity small,
+  .empty {
+    margin-top: 4px;
+    color: var(--muted);
+  }
+  .activity small {
+    text-transform: capitalize;
+  }
+  .mono {
+    overflow-wrap: anywhere;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.75rem;
+  }
+  .verification {
+    margin-top: 18px;
+    padding: 16px;
+    background: #e9efed;
+  }
+  .verification[data-status='invalid'] {
+    background: #fdebea;
+    color: #7e2424;
+  }
+  .keys {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+    margin: 14px 0 0;
+  }
+  .keys > div {
+    min-width: 0;
+    padding: 12px;
+    background: #fff;
+  }
+  .tamper {
+    font-weight: 700;
+  }
+  .tamper[data-status='valid'] {
+    color: #277a4c !important;
+  }
+  .tamper[data-status='invalid'] {
+    color: #7e2424 !important;
+  }
+  .refresh {
+    width: 100%;
+    border-color: var(--rule);
+    background: #fff;
+    color: var(--ink);
+  }
+  .refresh:hover {
+    background: #e9efed;
+  }
+  .manager-evidence {
+    margin-top: 24px !important;
+    padding: 0 !important;
+    border: 1px solid var(--rule) !important;
+    border-radius: 8px;
+    background: #f8faf9;
+  }
+  .manager-evidence > summary {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    align-items: center;
+    gap: 14px;
+    list-style: none;
+    padding: 16px 18px;
+    color: var(--ink);
+  }
+  .manager-evidence > summary::-webkit-details-marker {
+    display: none;
+  }
+  .manager-evidence > summary::after {
+    content: '+';
+    color: var(--amber);
+    font-size: 1.35rem;
+    line-height: 1;
+  }
+  .manager-evidence[open] > summary::after {
+    content: '−';
+  }
+  .manager-evidence > summary small,
+  .manager-evidence > summary strong {
+    display: block;
+  }
+  .manager-evidence > summary small {
+    color: var(--muted);
+    font-size: 0.75rem;
+  }
+  .manager-evidence > summary > span:last-of-type {
+    color: var(--teal-dark);
+    font-size: 0.8rem;
+  }
+  .manager-evidence-body {
+    padding: 0 18px 20px;
+    border-top: 1px solid var(--rule);
+  }
+  .manager-evidence-body > header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 18px;
+    padding-top: 20px;
+  }
+  .manager-evidence-body > p {
+    max-width: 70ch;
+    color: var(--muted);
+    line-height: 1.5;
+  }
+  .receipt-state {
+    padding: 5px 8px;
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 750;
+  }
+  .receipt-state[data-status='valid'] {
+    border-color: #86b59c;
+    color: #185d39;
+  }
+  .receipt-state[data-status='invalid'] {
+    border-color: #d9a09b;
+    color: #7e2424;
+  }
+  .receipts {
+    list-style: none;
+    margin: 16px 0 0;
+    padding: 0;
+  }
+  .receipts > li {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 5px 10px;
+    padding: 14px 0;
+    border-top: 1px solid var(--rule);
+  }
+  .receipts p,
+  .receipts details {
+    grid-column: 1 / -1;
+    margin: 4px 0 0;
+  }
+  .receipt-mark {
+    width: 10px;
+    height: 10px;
+    margin-top: 4px;
+    border-radius: 50%;
+    background: #9aa9a6;
+  }
+  .receipt-mark[data-status='pending'],
+  .receipt-mark[data-status='claimed'] {
+    background: var(--amber);
+  }
+  .receipt-mark[data-status='valid'] {
+    background: var(--teal);
+  }
+  .receipt-mark[data-status='invalid'] {
+    background: #b43a3a;
+  }
+  .receipt-result[data-status='valid'] {
+    color: var(--teal-dark);
+    font-weight: 750;
+  }
+  .receipt-result[data-status='invalid'],
+  .receipt-errors {
+    color: #7e2424;
+    font-weight: 700;
+  }
+  .key-summary {
+    color: var(--muted);
+    font-size: 0.8rem;
+  }
+  .key-summary code {
+    display: block;
+    margin-top: 4px;
+    color: var(--ink);
+  }
+  .canonical {
+    max-height: 150px;
+    overflow: auto;
+    padding: 8px;
+    background: #f3f6f5;
+    font-weight: 500 !important;
+    white-space: pre-wrap;
+  }
+  .key-comparison {
+    margin-top: 20px;
+    padding: 18px;
+    background: #e9efed;
+  }
+  .key-comparison[data-status='invalid'] {
+    background: #fdebea;
+  }
+  .proof-integrity {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    margin-top: 16px;
+    padding: 13px 0;
+    border-top: 1px solid var(--rule);
+    border-bottom: 1px solid var(--rule);
+  }
+  .proof-integrity span {
+    color: var(--teal-dark);
+    font-weight: 700;
+  }
+  .tamper-explainer {
+    margin-bottom: 0;
+    font-size: 0.82rem;
+  }
+  .message {
+    margin: 0 0 18px;
+    padding: 13px 16px;
+    border-radius: 6px;
+  }
+  .message.busy {
+    background: var(--amber-bg);
+  }
+  .message.error {
+    background: #fdebea;
+    color: #7e2424;
+  }
+  .loading {
+    margin-top: 40px;
+    padding: 30px;
+    background: #fff;
+  }
+  .work-order :focus-visible {
+    outline: 3px solid #54b8b2;
+    outline-offset: 3px;
+  }
+  @media (max-width: 840px) {
+    .request-head,
+    .ledger {
+      display: block;
+    }
+    .request-facts {
+      min-width: 0;
+      margin-top: 22px;
+    }
+    .activity {
+      position: static;
+      width: auto;
+      margin-top: 28px;
+    }
+    .brief-grid {
+      grid-template-columns: 1fr;
+    }
+    .evidence-gallery {
+      grid-template-columns: 1fr;
+    }
+    .keys {
+      grid-template-columns: 1fr;
+    }
+    .brief-grid section + section {
+      padding-left: 0;
+      border-left: 0;
+    }
+  }
+  @media (max-width: 600px) {
+    .work-order {
+      padding: 16px;
+    }
+    .service-bar {
+      display: block;
+    }
+    .service-bar nav {
+      margin-top: 16px;
+      flex-wrap: wrap;
+    }
+    .request-facts {
+      grid-template-columns: 1fr 1fr;
+    }
+    .progress {
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    .record > section,
+    .record > article {
+      padding: 22px 18px;
+    }
+    .manager-evidence > summary {
+      grid-template-columns: 1fr auto;
+    }
+    .manager-evidence > summary > span:last-of-type {
+      grid-column: 1;
+    }
+    .manager-evidence-body > header,
+    .proof-integrity {
+      display: block;
+    }
+    .receipt-state,
+    .proof-integrity span {
+      display: inline-block;
+      margin-top: 8px;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .work-order * {
+      scroll-behavior: auto !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+</style>

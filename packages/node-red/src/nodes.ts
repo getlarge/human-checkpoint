@@ -98,6 +98,12 @@ export default function registerNodes(RED: RedApi): void {
           const localPayload = structuredClone(payload);
           const created = createCheckpointEnvelope(
             checkpoint as 'research-authorization',
+            String(
+              msg.serviceRequestId ||
+                (msg.supportRequest as Record<string, unknown> | undefined)
+                  ?.id ||
+                '',
+            ),
             resolveEnv(String(config.teamId || msg.teamId)),
             localPayload as never,
           );
@@ -281,6 +287,65 @@ export default function registerNodes(RED: RedApi): void {
     }
   }
 
+  class RequestListNode implements RedNode {
+    declare on: RedNode['on'];
+    declare status: RedNode['status'];
+    declare error: RedNode['error'];
+    constructor(config: Record<string, unknown>) {
+      RED.nodes.createNode(this, config);
+      this.on('input', (msg, send, done) => {
+        try {
+          const customerIds = demoCustomerIds();
+          send({
+            payload: {
+              kind: 'human-checkpoint:request-queue',
+              requests: workflowStore()
+                .listSupportRequests()
+                .filter((request) => customerIds.has(request.customerId)),
+            },
+          });
+          done();
+        } catch (error) {
+          done(asError(error));
+        }
+      });
+    }
+  }
+
+  class RequestStartNode implements RedNode {
+    declare on: RedNode['on'];
+    declare status: RedNode['status'];
+    declare error: RedNode['error'];
+    constructor(config: Record<string, unknown>) {
+      RED.nodes.createNode(this, config);
+      this.on('input', (msg, send, done) => {
+        try {
+          const requestId = String(
+            msg.requestId ||
+              (msg.payload as Record<string, unknown> | undefined)?.requestId ||
+              '',
+          );
+          const store = workflowStore();
+          const request = store.getSupportRequest(requestId);
+          if (!request || !demoCustomerIds().has(request.customerId))
+            throw new Error('Support request not found');
+          if (request.status !== 'open')
+            throw new Error('Only open support requests can start work');
+          const workflow = store.startWorkflow(request.id);
+          send({
+            payload: {
+              kind: 'human-checkpoint:navigate',
+              url: `/dashboard/ui/technician-briefing#workflow=${encodeURIComponent(workflow.id)}`,
+            },
+          });
+          done();
+        } catch (error) {
+          done(asError(error));
+        }
+      });
+    }
+  }
+
   class WorkflowLoadNode implements RedNode {
     declare on: RedNode['on'];
     declare status: RedNode['status'];
@@ -289,18 +354,7 @@ export default function registerNodes(RED: RedApi): void {
       RED.nodes.createNode(this, config);
       this.on('input', (msg, send, done) => {
         try {
-          const requestBody = (
-            msg.req as { body?: Record<string, unknown> } | undefined
-          )?.body;
-          const requestQuery = (
-            msg.req as { query?: Record<string, unknown> } | undefined
-          )?.query;
-          const workflowId = String(
-            msg.workflowId ||
-              requestBody?.workflowId ||
-              requestQuery?.workflow ||
-              '',
-          );
+          const workflowId = String(msg.workflowId || '');
           if (!workflowId)
             throw new Error(
               'Open the assigned request before starting this action',
@@ -351,7 +405,18 @@ export default function registerNodes(RED: RedApi): void {
           if (!step || step.status === 'failed')
             step = store.beginStep(workflowId, stepKey, taskBody);
           if (step.status === 'completed') {
-            send({ ...msg, payload: step.result, taskResult: step.result });
+            const normalized = normalizeTaskResult(taskRole, step.result);
+            if (normalized.changed) {
+              step = store.replaceCompletedStepResult(
+                workflowId,
+                stepKey,
+                normalized.result,
+              );
+            }
+            send([
+              { ...msg, payload: step.result, taskResult: step.result },
+              null,
+            ]);
             done();
             return;
           }
@@ -367,9 +432,11 @@ export default function registerNodes(RED: RedApi): void {
               : '';
           const attempt =
             latest && taskId ? latest.attempt : (latest?.attempt ?? 0) + 1;
+          let currentStatus = latest?.status ?? 'queued';
           if (!taskId) {
             const created = await agent.createTask(taskBody);
             taskId = created.id;
+            currentStatus = created.status;
             store.linkMoltNetTask({
               workflowId,
               taskRole,
@@ -379,16 +446,43 @@ export default function registerNodes(RED: RedApi): void {
               outputRef: null,
             });
           }
+          send([
+            null,
+            taskProgressMessage(msg, {
+              taskId,
+              taskRole,
+              attempt,
+              status: currentStatus,
+            }),
+          ]);
           this.status({
             fill: 'blue',
             shape: 'ring',
             text: `waiting for ${taskRole}`,
           });
-          const result = await agent.waitForTask(
-            taskId,
-            artifactKind ? { artifactKind } : {},
-          );
-          const storedResult = {
+          const result = await agent.waitForTask(taskId, {
+            ...(artifactKind ? { artifactKind } : {}),
+            onStatus: (task) => {
+              store.linkMoltNetTask({
+                workflowId,
+                taskRole,
+                taskId,
+                attempt,
+                status: task.status,
+                outputRef: null,
+              });
+              send([
+                null,
+                taskProgressMessage(msg, {
+                  taskId,
+                  taskRole,
+                  attempt,
+                  status: task.status,
+                }),
+              ]);
+            },
+          });
+          const rawStoredResult = {
             accepted: result.accepted,
             taskId,
             taskStatus: result.task.status,
@@ -398,6 +492,10 @@ export default function registerNodes(RED: RedApi): void {
             artifact: result.artifact,
             artifactBody: result.artifactBody,
           };
+          const storedResult = normalizeTaskResult(
+            taskRole,
+            rawStoredResult,
+          ).result;
           store.linkMoltNetTask({
             workflowId,
             taskRole,
@@ -422,12 +520,15 @@ export default function registerNodes(RED: RedApi): void {
             shape: 'dot',
             text: `${taskRole} complete`,
           });
-          send({
-            ...msg,
-            payload: storedResult,
-            taskResult: storedResult,
-            taskId,
-          });
+          send([
+            {
+              ...msg,
+              payload: storedResult,
+              taskResult: storedResult,
+              taskId,
+            },
+            null,
+          ]);
           done();
         } catch (error) {
           this.status({ fill: 'red', shape: 'ring', text: 'task failed' });
@@ -509,6 +610,14 @@ export default function registerNodes(RED: RedApi): void {
   RED.nodes.registerType(
     'human-checkpoint-verify-proof',
     VerifyProofNode as never,
+  );
+  RED.nodes.registerType(
+    'human-checkpoint-request-list',
+    RequestListNode as never,
+  );
+  RED.nodes.registerType(
+    'human-checkpoint-request-start',
+    RequestStartNode as never,
   );
   RED.nodes.registerType(
     'human-checkpoint-workflow-load',
@@ -599,8 +708,14 @@ async function buildJourneyView(
       status: request.status,
       requestId: request.id,
       canonicalMessage: request.message,
+      purpose: request.purpose,
+      teamId: request.teamId,
+      verificationMethod: request.verificationMethod,
       expiresAt: request.expiresAt,
       completedAt: request.completedAt,
+      valid: request.valid,
+      claimantId: request.claimedByHumanId,
+      credentialId: request.signingCredentialId,
       derivedPublicKey: request.receipt?.value?.derivedPublicKey ?? null,
       ...(decision === 'public-source-check'
         ? { scope: envelope?.payload ?? null }
@@ -617,10 +732,53 @@ async function buildJourneyView(
     approval('work-order-release'),
   ]);
   snapshot = store.getWorkflowSnapshot(workflowId);
+  const recoverableStep = snapshot.steps.find(
+    (item) => item.stepKey === 'prepare-brief' && item.status === 'completed',
+  );
+  if (
+    recoverableStep &&
+    ['waiting-for-public-source-approval', 'researching'].includes(
+      snapshot.workflow.state,
+    )
+  ) {
+    const normalized = normalizeTaskResult(
+      'technician-brief',
+      recoverableStep.result,
+    );
+    if (normalized.changed) {
+      store.replaceCompletedStepResult(
+        workflowId,
+        'prepare-brief',
+        normalized.result,
+      );
+    }
+    const recoveredResult = recordValue(normalized.result);
+    if (
+      isBriefRecoveryEligible({
+        brief: recordValue(recoveredResult?.artifactBody),
+        requestId: snapshot.request.id,
+        approval: recordValue(research),
+      })
+    ) {
+      store.transitionWorkflow(
+        workflowId,
+        'brief-ready',
+        'approve-work-order',
+        'workflow.technician_brief_recovered',
+        { taskId: recoveredResult?.taskId ?? null },
+      );
+    }
+    snapshot = store.getWorkflowSnapshot(workflowId);
+  }
   const review = stepResult(snapshot.steps, 'review-request');
   const preparedBrief = stepResult(snapshot.steps, 'prepare-brief');
   const briefBody = recordValue(recordValue(preparedBrief)?.artifactBody);
-  const immutable = Boolean(briefBody && snapshot.workflow.state !== 'failed');
+  const immutable = Boolean(
+    briefBody &&
+    ['brief-ready', 'waiting-for-release-approval', 'released'].includes(
+      snapshot.workflow.state,
+    ),
+  );
   const findings = stringArray(
     briefBody?.findings ?? briefBody?.questionsToCheck,
   );
@@ -676,9 +834,100 @@ function arrayValue(value: unknown): unknown[] {
 }
 
 function stringArray(value: unknown): string[] {
-  return arrayValue(value).filter(
-    (item): item is string => typeof item === 'string',
-  );
+  if (typeof value === 'string' && value.trim()) return [value.trim()];
+  const values = Array.isArray(value)
+    ? value
+    : Object.values(recordValue(value) ?? {});
+  return values
+    .filter((item): item is string => typeof item === 'string')
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function taskProgressMessage(
+  _msg: Record<string, unknown>,
+  task: {
+    taskId: string;
+    taskRole: string;
+    attempt: number;
+    status: string;
+  },
+): Record<string, unknown> {
+  return {
+    payload: { kind: 'human-checkpoint:task-status', task },
+  };
+}
+
+export function normalizeTaskResult(
+  taskRole: string,
+  value: unknown,
+): { changed: boolean; result: unknown } {
+  if (taskRole !== 'technician-brief') return { changed: false, result: value };
+  const result = recordValue(value);
+  const body = recordValue(result?.artifactBody);
+  if (!result || !body) return { changed: false, result: value };
+
+  const normalizedBody = { ...body };
+  let changed = false;
+  for (const field of ['findings', 'questionsToCheck', 'unknowns'] as const) {
+    const current = normalizedBody[field];
+    const normalized = stringArray(current);
+    if (!Array.isArray(current) && normalized.length) {
+      normalizedBody[field] = normalized;
+      changed = true;
+    }
+  }
+  if (!changed) return { changed: false, result: value };
+  return {
+    changed: true,
+    result: {
+      ...result,
+      artifactBodyRaw: result.artifactBodyRaw ?? body,
+      artifactBody: normalizedBody,
+    },
+  };
+}
+
+export function isBriefRecoveryEligible(input: {
+  brief: Record<string, unknown> | null;
+  requestId: string;
+  approval: Record<string, unknown> | null;
+}): boolean {
+  const { brief, requestId, approval } = input;
+  if (
+    approval?.status !== 'completed' ||
+    !brief?.grounded ||
+    brief.requestId !== requestId ||
+    brief.approvalRequestId !== approval.requestId ||
+    brief.rootCause ||
+    brief.causes ||
+    brief.diagnosis ||
+    stringArray(brief.findings).length < 1 ||
+    stringArray(brief.questionsToCheck).length < 2 ||
+    stringArray(brief.unknowns).length < 1
+  ) {
+    return false;
+  }
+  const scope = recordValue(approval.scope);
+  const allowedDomains = stringArray(scope?.allowedDomains);
+  const sources = arrayValue(brief.sources)
+    .map((value) => recordValue(value))
+    .filter((value): value is Record<string, unknown> => Boolean(value));
+  if (!allowedDomains.length || !sources.length) return false;
+  return sources.every((source) => {
+    try {
+      const url = new URL(String(source.url ?? ''));
+      return (
+        url.protocol === 'https:' &&
+        allowedDomains.some(
+          (domain) =>
+            url.hostname === domain || url.hostname.endsWith(`.${domain}`),
+        )
+      );
+    } catch {
+      return false;
+    }
+  });
 }
 
 function requireAgent(RED: RedApi, id: string): MoltNetAgentClient {
@@ -686,6 +935,19 @@ function requireAgent(RED: RedApi, id: string): MoltNetAgentClient {
   if (!node?.client)
     throw new Error('Human Checkpoint agent credentials are not configured');
   return node.client;
+}
+
+function demoCustomerIds(): Set<string> {
+  const configured =
+    process.env.HUMAN_CHECKPOINT_DEMO_CUSTOMER_IDS ??
+    process.env.HUMAN_CHECKPOINT_DEMO_CUSTOMER_ID ??
+    'CUST-NORTH-WATER,CUST-ASTER-COMPONENTS';
+  return new Set(
+    configured
+      .split(',')
+      .map((value) => value.trim())
+      .filter(Boolean),
+  );
 }
 function asError(error: unknown): Error {
   return error instanceof Error ? error : new Error(String(error));
