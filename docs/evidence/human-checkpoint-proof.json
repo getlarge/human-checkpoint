@@ -1,0 +1,91 @@
+{
+  "format": "human-checkpoint-proof:v1",
+  "serviceRequestId": "SR-2048",
+  "teamId": "2376e083-9114-42d5-800e-da7d11695a6d",
+  "exportedAt": "2026-08-05T21:02:50.184Z",
+  "checkpoints": [
+    {
+      "checkpoint": "research-authorization",
+      "canonicalMessage": "{\"checkpoint\":\"research-authorization\",\"payload\":{\"allowedDomains\":[\"skf.com\",\"fluke.com\",\"pumps.org\"],\"authorizationExpiresAt\":\"2026-08-05T21:04:28.003Z\",\"externalTool\":\"exa\",\"maxResults\":4,\"queries\":[\"SKF-CWP-200 pump drive-end vibration causes\",\"SKF-CWP-200 vibration troubleshooting guide\"],\"reason\":\"The active request reports a significant increase in drive-end vibration (2.1 to 4.8 mm/s RMS). History shows a previous drive-end vibration event on a different asset of the same model resolved by soft-foot correction and alignment.\"},\"serviceRequestId\":\"SR-2048\",\"teamId\":\"2376e083-9114-42d5-800e-da7d11695a6d\",\"v\":\"human-checkpoint:v1\"}",
+      "request": {
+        "id": "858430cc-908b-4294-a8e6-4ec8a2532267",
+        "status": "completed",
+        "nonce": "8650b2a3-aefc-4f26-850e-9acd09ace268",
+        "purpose": "human-checkpoint:research-authorization",
+        "teamId": "2376e083-9114-42d5-800e-da7d11695a6d",
+        "verificationMethod": "human-hardware-previewsign",
+        "expiresAt": "2026-08-05T21:04:28.039Z",
+        "completedAt": "2026-08-05T21:00:21.408Z",
+        "claimantId": "e0f1346e-4715-481b-a5ef-83fcdb45495b",
+        "credentialId": "7b2bdfd2-9a99-40c1-9d70-54847e38ca53",
+        "valid": true
+      },
+      "evidence": {
+        "version": 1,
+        "operation": "signing-request",
+        "requestId": "858430cc-908b-4294-a8e6-4ec8a2532267",
+        "credentialId": "7b2bdfd2-9a99-40c1-9d70-54847e38ca53",
+        "teamId": "2376e083-9114-42d5-800e-da7d11695a6d",
+        "claimantId": "e0f1346e-4715-481b-a5ef-83fcdb45495b",
+        "verificationMethod": "human-hardware-previewsign",
+        "nonce": "8650b2a3-aefc-4f26-850e-9acd09ace268",
+        "purpose": "human-checkpoint:research-authorization",
+        "expiresAt": "2026-08-05T21:04:28.039Z",
+        "envelope": "eyJhdWRpZW5jZSI6Im1vbHRuZXQ6cHJldmlldy1zaWduIiwiY2xhaW1hbnRJZCI6ImUwZjEzNDZlLTQ3MTUtNDgxYi1hNWVmLTgzZmNkYjQ1NDk1YiIsImNyZWRlbnRpYWxJZCI6IjdiMmJkZmQyLTlhOTktNDBjMS05ZDcwLTU0ODQ3ZTM4Y2E1MyIsImV4cGlyZXNBdCI6IjIwMjYtMDgtMDVUMjE6MDQ6MjguMDM5WiIsIm5vbmNlIjoiODY1MGIyYTMtYWVmYy00ZjI2LTg1MGUtOWFjZDA5YWNlMjY4Iiwib3BlcmF0aW9uIjoic2lnbmluZy1yZXF1ZXN0IiwicHVibGljTWF0ZXJpYWxIYXNoIjoiTjV4VDZmNlE2a0g1bTZ4TWJtR3NCeXRGaVRMTVg0R1VQTDVmT1ZYVzg4WSIsInB1cnBvc2UiOiJodW1hbi1jaGVja3BvaW50OnJlc2VhcmNoLWF1dGhvcml6YXRpb24iLCJyZXF1ZXN0SWQiOiI4NTg0MzBjYy05MDhiLTQyOTQtYThlNi00ZWM4YTI1MzIyNjciLCJzaWduaW5nUGF5bG9hZCI6ImJXOXNkRzVsZERwMk1RQUFBQ0NLZjBBNVBzdWlzZ2dkay9teTJ6YVVVSUY1aVdTOWg1RW1GSVh2QnB4M3l3QUFBQ1E0TmpVd1lqSmhNeTFoWldaakxUUm1Nall0T0RVd1pTMDVZV05rTURsaFkyVXlOamc9IiwidGVhbUlkIjoiMjM3NmUwODMtOTExNC00MmQ1LTgwMGUtZGE3ZDExNjk1YTZkIiwidmVyaWZpY2F0aW9uTWV0aG9kIjoiaHVtYW4taGFyZHdhcmUtcHJldmlld3NpZ24iLCJ2ZXJzaW9uIjoxfQ",
+        "digest": "ppgegGd_wA5H4PSssvGAY4trwpkhP0rekPePPpQUzkQ",
+        "additionalArgumentsHash": "xHofiWRqu1LtSdVqOF5vBppstkOmUKnmJFBIUjLdTC0",
+        "derivedPublicKey": {
+          "kty": 2,
+          "algorithm": -9,
+          "curve": 1,
+          "x": "FyepACFfno8rDOitLWjjW_fgAnpOTT3l9fI_YbbMOfc",
+          "y": "LOsej7IBK0Wx4JIxgHO_tQ2vsTeNJ-588fpefeueG2I"
+        },
+        "signature": "MEQCIEC4QuM9_EOgtw5bqOXVZZkmY4CanlWjMwSkRNB5fFYdAiAhGogOOQ0k-dJOAe-J1XsGCUs5tKvdAglhi5z5TrgOAQ",
+        "proofHash": "z4-vWzDX9oPgzDLCV7VxKUHZ44cEkTIKSmjHFOlE27A"
+      }
+    },
+    {
+      "checkpoint": "field-release",
+      "canonicalMessage": "{\"checkpoint\":\"field-release\",\"payload\":{\"brief\":{\"approvalRequestId\":\"858430cc-908b-4294-a8e6-4ec8a2532267\",\"findings\":[\"The asset model SKF-CWP-200 has a history of drive-end vibration on other units, which was previously resolved through soft-foot correction and alignment.\",\"General SKF guidance identifies poor shaft or housing alignment and poor mounting procedures as common root causes for excessive vibration in industrial pumps.\"],\"grounded\":true,\"questionsToCheck\":[\"Is there a known vibration threshold for the SKF-CWP-200 drive-end?\",\"Are there specific alignment tolerances defined in the manufacturer manual for this model?\"],\"requestId\":\"SR-2048\",\"requestSummary\":\"Drive-end vibration on pump P-2048 (SKF-CWP-200) has increased from 2.1 to 4.8 mm/s RMS.\",\"sources\":[{\"title\":\"Pump Vibration & Troubleshooting Strategies, Part 1 - Pumps.org\",\"url\":\"https://www.pumps.org/2023/10/12/pump-vibration-troubleshooting-strategies-part-1/\"},{\"title\":\"Pump Vibration & Troubleshooting Strategies, Part 2\",\"url\":\"https://www.pumps.org/2023/10/12/pump-vibration-troubleshooting-strategies-part-2/\"},{\"title\":\"ANSI/HI 9.6.4 2016 Rotodynamic Pumps for Vibration Measurments and Allowable Values\",\"url\":\"https://www.pumps.org/wp-content/uploads/2022/01/9.6.4c.pdf\"},{\"title\":\"Reduced vibration and noise | SKF\",\"url\":\"https://www.skf.com/group/industries/general-machinery/industrial-pumps/challenges/reduced-vibration-and-noise\"}],\"title\":\"Pre-visit Technician Brief: Cooling-water circulation pump P-2048\",\"unknowns\":[\"Current operational load/RPM during vibration increase\",\"Whether recent maintenance was performed on P-2048 prior to the spike\"]},\"disposition\":\"accepted-with-field-amendment\",\"fieldAmendment\":\"Install a temporary exclusion marker at the south access point before restart.\",\"role\":\"Lead field technician\",\"shift\":\"Day / A\"},\"serviceRequestId\":\"SR-2048\",\"teamId\":\"2376e083-9114-42d5-800e-da7d11695a6d\",\"v\":\"human-checkpoint:v1\"}",
+      "request": {
+        "id": "1cadda0e-cc6e-4216-b89c-307c27df6e32",
+        "status": "completed",
+        "nonce": "805a0c99-5681-4181-89fb-db3f5aaa98b9",
+        "purpose": "human-checkpoint:field-release",
+        "teamId": "2376e083-9114-42d5-800e-da7d11695a6d",
+        "verificationMethod": "human-hardware-previewsign",
+        "expiresAt": "2026-08-05T21:06:50.582Z",
+        "completedAt": "2026-08-05T21:02:16.437Z",
+        "claimantId": "e0f1346e-4715-481b-a5ef-83fcdb45495b",
+        "credentialId": "7b2bdfd2-9a99-40c1-9d70-54847e38ca53",
+        "valid": true
+      },
+      "evidence": {
+        "version": 1,
+        "operation": "signing-request",
+        "requestId": "1cadda0e-cc6e-4216-b89c-307c27df6e32",
+        "credentialId": "7b2bdfd2-9a99-40c1-9d70-54847e38ca53",
+        "teamId": "2376e083-9114-42d5-800e-da7d11695a6d",
+        "claimantId": "e0f1346e-4715-481b-a5ef-83fcdb45495b",
+        "verificationMethod": "human-hardware-previewsign",
+        "nonce": "805a0c99-5681-4181-89fb-db3f5aaa98b9",
+        "purpose": "human-checkpoint:field-release",
+        "expiresAt": "2026-08-05T21:06:50.582Z",
+        "envelope": "eyJhdWRpZW5jZSI6Im1vbHRuZXQ6cHJldmlldy1zaWduIiwiY2xhaW1hbnRJZCI6ImUwZjEzNDZlLTQ3MTUtNDgxYi1hNWVmLTgzZmNkYjQ1NDk1YiIsImNyZWRlbnRpYWxJZCI6IjdiMmJkZmQyLTlhOTktNDBjMS05ZDcwLTU0ODQ3ZTM4Y2E1MyIsImV4cGlyZXNBdCI6IjIwMjYtMDgtMDVUMjE6MDY6NTAuNTgyWiIsIm5vbmNlIjoiODA1YTBjOTktNTY4MS00MTgxLTg5ZmItZGIzZjVhYWE5OGI5Iiwib3BlcmF0aW9uIjoic2lnbmluZy1yZXF1ZXN0IiwicHVibGljTWF0ZXJpYWxIYXNoIjoiTjV4VDZmNlE2a0g1bTZ4TWJtR3NCeXRGaVRMTVg0R1VQTDVmT1ZYVzg4WSIsInB1cnBvc2UiOiJodW1hbi1jaGVja3BvaW50OmZpZWxkLXJlbGVhc2UiLCJyZXF1ZXN0SWQiOiIxY2FkZGEwZS1jYzZlLTQyMTYtYjg5Yy0zMDdjMjdkZjZlMzIiLCJzaWduaW5nUGF5bG9hZCI6ImJXOXNkRzVsZERwMk1RQUFBQ0RTU3kyc0RTM0RISnIrYTFCSUVZemhnbExIQzlaUVZOUkRtZTNmTmE3TlR3QUFBQ1E0TURWaE1HTTVPUzAxTmpneExUUXhPREV0T0RsbVlpMWtZak5tTldGaFlUazRZams9IiwidGVhbUlkIjoiMjM3NmUwODMtOTExNC00MmQ1LTgwMGUtZGE3ZDExNjk1YTZkIiwidmVyaWZpY2F0aW9uTWV0aG9kIjoiaHVtYW4taGFyZHdhcmUtcHJldmlld3NpZ24iLCJ2ZXJzaW9uIjoxfQ",
+        "digest": "PzIyeepTitWV8_FRLAAcyWDHEB0aAxDBGSSorPxwmzQ",
+        "additionalArgumentsHash": "ENWvHWD2wxZtTV9A_E_1HrOAWhbNRnYz07bFhhdTeJY",
+        "derivedPublicKey": {
+          "kty": 2,
+          "algorithm": -9,
+          "curve": 1,
+          "x": "uVdADVqqJLzUFPON29gOaThUUgcRh6ocW94LJsjqXnM",
+          "y": "xhen-0e5SDlCEw2k4uhLNwv4Rp9LLbD9CVfw2Tt7tNc"
+        },
+        "signature": "MEQCIGK6Z1uXaTKe_8KSeHF6FYvB_YMO33FO673GnYQMm_CSAiBE31tD93T4IdZ3FOUHuoIkT0HjPS_vdYkvDNHpRbFMcQ",
+        "proofHash": "cyCY54aQjPkPD0flC_xRrlvKUq050I_ubmO2_68QoJI"
+      }
+    }
+  ],
+  "proofHash": "gEKh5NTBqpVqeLOhwGRFY5RRjDE0cCT5v_iQViDYxDY"
+}

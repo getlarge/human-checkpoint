@@ -10,3 +10,6 @@ out-tsc/
 .sessions.json*
 coverage/
 *.log
+
+# Raw screen captures. Publish the edited cut, not the raw source.
+docs/demo-assets/*.mov

@@ -26,7 +26,9 @@
     "format:check": "prettier --check .",
     "test": "pnpm -r test",
     "typecheck": "pnpm -r typecheck",
-    "verify-proof": "pnpm --filter @human-checkpoint/core verify-proof"
+    "verify-proof": "pnpm --filter @human-checkpoint/core verify-proof",
+    "site:build": "pnpm --filter @human-checkpoint/core build && node scripts/build-site-vendor.mjs",
+    "site:serve": "node scripts/serve-site.mjs"
   },
   "devDependencies": {
     "@themoltnet/signer": "0.2.0",
