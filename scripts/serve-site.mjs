@@ -39,20 +39,56 @@ const server = createServer(async (request, response) => {
   }
 
   let file = candidate;
+  let info;
   try {
-    const info = await stat(file);
-    if (info.isDirectory()) file = join(file, 'index.html');
-    await stat(file);
+    info = await stat(file);
+    if (info.isDirectory()) {
+      file = join(file, 'index.html');
+      info = await stat(file);
+    }
   } catch {
     response.writeHead(404, { 'content-type': 'text/plain' }).end('Not found');
     return;
   }
 
-  response.writeHead(200, {
+  const headers = {
     'content-type':
       TYPES[extname(file).toLowerCase()] ?? 'application/octet-stream',
     'cache-control': 'no-store',
-  });
+    'accept-ranges': 'bytes',
+  };
+
+  // Video needs byte ranges: without them the browser cannot seek, and opening
+  // the file directly fails rather than playing.
+  const range = /^bytes=(\d*)-(\d*)$/.exec(request.headers.range ?? '');
+  if (range) {
+    const size = info.size;
+    let start = range[1] === '' ? size - Number(range[2]) : Number(range[1]);
+    let end = range[1] === '' || range[2] === '' ? size - 1 : Number(range[2]);
+    if (
+      !Number.isFinite(start) ||
+      !Number.isFinite(end) ||
+      start > end ||
+      start >= size
+    ) {
+      response
+        .writeHead(416, { ...headers, 'content-range': `bytes */${size}` })
+        .end();
+      return;
+    }
+    end = Math.min(end, size - 1);
+    response.writeHead(206, {
+      ...headers,
+      'content-range': `bytes ${start}-${end}/${size}`,
+      'content-length': end - start + 1,
+    });
+    if (request.method === 'HEAD') return response.end();
+    createReadStream(file, { start, end }).pipe(response);
+    return;
+  }
+
+  response.writeHead(200, { ...headers, 'content-length': info.size });
+  if (request.method === 'HEAD') return response.end();
   createReadStream(file).pipe(response);
 });
 

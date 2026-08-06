@@ -51,9 +51,29 @@ Two small shims let the compiled modules load in a browser, both written by
 
 No other line of the gate is altered.
 
-## Adding the demo video
+## Demo video
 
-Drop `walkthrough.mp4` (or `.webm`) into `demo-assets/`, or set `VIDEO_URL` at
-the top of the page script to a YouTube, Vimeo, or direct-file URL. Until then
-the player hides itself and shows a placeholder. Fallback stills belong in
-`demo-assets/` using the names listed in `../DEMO.md`.
+`demo-assets/walkthrough.mp4` is the edited 1080p walkthrough used by the site.
+It begins after the one-time YubiKey enrollment, states that prerequisite on
+screen, marks the off-screen field inspection before the technician's final
+note, preserves both real signer ceremonies at normal speed, and accelerates
+only the agent-task wait. The 105-second H.264 file is approximately 8 MB.
+
+To replace it, write a new `walkthrough.mp4` (or `.webm`) into `demo-assets/`,
+or set `VIDEO_URL` at the top of the page script to a YouTube, Vimeo, or
+direct-file URL.
+
+## Node-RED screenshots
+
+- `screenshots/yubikey-ready.jpg` — the live setup page confirming the local
+  companion, enrolled YubiKey credential, and team activation.
+- `screenshots/node-red-flow-overview.jpg` — the complete durable workflow.
+- `screenshots/node-red-review-and-preparation.jpg` — request review, claim,
+  and agent preparation lanes.
+- `screenshots/node-red-release-and-proof.jpg` — signed release and offline
+  evidence lanes.
+- `screenshots/node-red-flow-ui-and-nodes.jpg` — the flow beside the custom
+  Human Checkpoint nodes and FlowFuse Dashboard layout.
+
+These images are documentation artifacts from the running read-only editor,
+not diagrams recreated after the fact.

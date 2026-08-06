@@ -412,6 +412,7 @@
       <div class="wrap">
         <span class="brand">Human Checkpoint <span>· field service</span></span>
         <nav class="site">
+          <a href="#problem">Problem</a>
           <a href="#watch">Watch</a>
           <a href="#walkthrough">Walkthrough</a>
           <a href="#gate">Gate console</a>
@@ -419,6 +420,8 @@
           <a href="#nodejs">Node.js libs</a>
           <a href="#moltnet">MoltNet</a>
           <a href="#verify">Verify it</a>
+          <a href="#setup">Setup</a>
+          <a href="#stack">Stack</a>
           <a href="https://github.com/getlarge/human-checkpoint">Source</a>
         </nav>
       </div>
@@ -469,13 +472,91 @@
       </div>
     </div>
 
+    <section id="problem">
+      <div class="wrap">
+        <p class="kicker">The problem</p>
+        <h2>Agents are getting real authority. Approval hasn't kept up.</h2>
+        <div class="grid2">
+          <div>
+            <p>
+              AI agents increasingly take consequential actions — they search,
+              spend, dispatch, and close work orders. The two controls usually
+              placed around them do not actually bind a human to any specific
+              action:
+            </p>
+            <ul class="plain">
+              <li>
+                <strong>A login at the front door.</strong> A session authorises
+                everything the agent does for as long as the token lives. Nobody
+                approved <em>this</em> action; somebody approved the day.
+              </li>
+              <li>
+                <strong>An audit log afterwards.</strong> It records what a
+                system claims happened, and whoever controls the database
+                controls the record. It proves nothing to anyone outside.
+              </li>
+            </ul>
+            <p>
+              In field service the gap is concrete. An agent drafts a work order
+              from past service history. If it releases that order unchecked, a
+              pump goes back into service on an AI's judgement, and the only
+              evidence is a log row the vendor wrote about itself.
+            </p>
+          </div>
+          <div class="panel">
+            <h3>Our solution</h3>
+            <p>
+              Put the hardware key <em>inside</em> the agent's action boundary
+              rather than at the front door.
+            </p>
+            <ul class="caps">
+              <li class="allow">
+                <span class="mark">✓</span>
+                <span
+                  >Before each consequential step, the exact decision is
+                  canonicalised to bytes and shown to the technician.</span
+                >
+              </li>
+              <li class="allow">
+                <span class="mark">✓</span>
+                <span
+                  >One touch on a YubiKey 5.8 signs <em>those</em> bytes — not a
+                  session, not a summary.</span
+                >
+              </li>
+              <li class="allow">
+                <span class="mark">✓</span>
+                <span
+                  >The runtime re-fetches and re-validates that signature before
+                  it acts. No signature, no action.</span
+                >
+              </li>
+              <li class="allow">
+                <span class="mark">✓</span>
+                <span
+                  >The result verifies offline, by anyone, with no access to our
+                  systems.</span
+                >
+              </li>
+            </ul>
+            <p class="note" style="margin: 16px 0 0">
+              You can check that last claim yourself further down this page — it
+              runs real signature verification in your browser.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <section id="watch">
       <div class="wrap">
         <p class="kicker">Recorded walkthrough</p>
         <h2>Watch the real ceremony</h2>
         <p>
-          The full workflow end to end, including both physical YubiKey touches.
-          Captions are burned in — it reads fine muted.
+          The operational workflow after one-time enrollment, including both
+          physical YubiKey touches. The agent-task wait is accelerated; the
+          field-inspection intertitle marks an off-screen time jump. The
+          requests, signer prompts, approvals, and verification are unaltered.
         </p>
         <figure id="video-figure" style="margin: 0">
           <video
@@ -496,17 +577,21 @@
             <source src="demo-assets/walkthrough.webm" type="video/webm" />
           </video>
           <figcaption class="note" style="margin-top: 10px" id="video-caption">
-            Recorded on the live product UI. The operator performs only the two
-            hardware touches; every other action travels through the visible
-            dashboard.
+            Recorded on the live product UI. Enrollment is stated on the opening
+            card and remains available on the dedicated hardware setup page; the
+            recording begins with an assigned service request.
           </figcaption>
         </figure>
-        <div class="status" id="video-missing" hidden data-tone="amber">
-          <strong>The recording is not published yet.</strong> Drop
-          <code>walkthrough.mp4</code> (or <code>.webm</code>) into
-          <code>docs/demo-assets/</code>, or set a public URL at the top of this
-          page's script, and the player appears here.
-        </div>
+        <p class="note" style="margin-top: 12px">
+          <a href="demo-assets/walkthrough.mp4" download
+            >Download the recording</a
+          >
+          ·
+          <a href="demo-assets/walkthrough.mp4" target="_blank" rel="noreferrer"
+            >open in a new tab ↗</a
+          >
+          <span id="video-meta"></span>
+        </p>
       </div>
     </section>
 
@@ -599,7 +684,7 @@ Pick a case above to call the gate.</pre
 
     <section id="yubikey">
       <div class="wrap">
-        <h2>What the YubiKey actually does here</h2>
+        <h2>How we use YubiKey 5.8: previewSign and ARKG</h2>
         <div class="grid2">
           <div>
             <p>
@@ -649,6 +734,48 @@ Pick a case above to call the gate.</pre
                 >
               </li>
             </ul>
+          </div>
+        </div>
+
+        <h3 style="margin-top: 32px">
+          Enrollment, and why it takes two people
+        </h3>
+        <div class="grid2">
+          <figure style="margin: 0">
+            <img
+              src="demo-assets/screenshots/yubikey-ready.jpg"
+              alt="YubiKey approval setup page: local companion connected, approval key ready with method human-hardware-previewsign and a credential ID, and setup progress showing companion connected, YubiKey enrolled, credential activated"
+              style="
+                width: 100%;
+                border: 1px solid var(--rule);
+                border-radius: var(--panel);
+                display: block;
+              "
+            />
+            <figcaption class="note" style="margin-top: 10px">
+              The ready state the technician sees before any work is claimed.
+            </figcaption>
+          </figure>
+          <div>
+            <p>
+              Enrollment registers the outer credential and the ARKG seed that
+              later derives every per-decision key. The page reports the method
+              (<code>human-hardware-previewsign</code>) and the credential ID,
+              so the technician can tell which physical key is bound to this
+              team.
+            </p>
+            <p>
+              The three-step progress rail is the whole trust chain: the
+              loopback companion connects, the key enrolls, and then a
+              <strong>second person activates the credential</strong>. MoltNet
+              refuses to let a credential owner approve their own credential, so
+              enrollment alone grants nothing.
+            </p>
+            <p class="note">
+              Capability is detected, never inferred from a version string — the
+              signer confirms the key advertises previewSign and refuses an
+              ambiguous multi-device selection.
+            </p>
           </div>
         </div>
       </div>
@@ -828,6 +955,58 @@ Pick a case above to call the gate.</pre
             </tbody>
           </table>
         </div>
+        <h3 style="margin-top: 32px">The running Node-RED flow</h3>
+        <p>
+          The dashboard and server-side orchestration are one flow. Click either
+          image for the full-resolution editor capture.
+        </p>
+        <div class="grid2">
+          <figure style="margin: 0">
+            <a
+              href="demo-assets/screenshots/node-red-review-and-preparation.jpg"
+            >
+              <img
+                src="demo-assets/screenshots/node-red-review-and-preparation.jpg"
+                alt="Node-RED lanes that review and claim a service request, then run the MoltNet preparation tasks"
+                style="
+                  width: 100%;
+                  border: 1px solid var(--rule);
+                  border-radius: var(--panel);
+                  display: block;
+                "
+              />
+            </a>
+            <figcaption class="note" style="margin-top: 10px">
+              Claim first; only then create the MoltNet review and brief tasks.
+            </figcaption>
+          </figure>
+          <figure style="margin: 0">
+            <a href="demo-assets/screenshots/node-red-release-and-proof.jpg">
+              <img
+                src="demo-assets/screenshots/node-red-release-and-proof.jpg"
+                alt="Node-RED lanes that verify work-order approval, close the request, and build portable evidence"
+                style="
+                  width: 100%;
+                  border: 1px solid var(--rule);
+                  border-radius: var(--panel);
+                  display: block;
+                "
+              />
+            </a>
+            <figcaption class="note" style="margin-top: 10px">
+              Re-fetch and verify before release; then export offline evidence.
+            </figcaption>
+          </figure>
+        </div>
+        <p class="note" style="margin-top: 16px">
+          <a href="demo-assets/screenshots/node-red-flow-overview.jpg"
+            >Open the complete flow</a
+          >
+          or
+          <a href="demo-assets/screenshots/node-red-flow-ui-and-nodes.jpg"
+            >see its dashboard layout and custom nodes</a
+          >.
+        </p>
         <p class="note" style="margin-top: 16px">
           Full provisioning reference — OAuth clients and scopes, the runtime
           policy and profile, the agent daemon invocation, and troubleshooting —
@@ -884,6 +1063,183 @@ Press “Verify both signatures” to run the checks in your browser.</pre
           The same checks run in Node against the committed record with
           <code>node scripts/verify-evidence.mjs</code>, which additionally
           validates the aggregate proof hash and full envelope metadata.
+        </p>
+      </div>
+    </section>
+
+    <section id="setup">
+      <div class="wrap">
+        <p class="kicker">Setup &amp; run</p>
+        <h2>Running it yourself</h2>
+        <p>There are two paths. Only one of them needs hardware.</p>
+
+        <div class="panel" style="margin-bottom: 24px">
+          <h3>Check the evidence — no hardware, 60 seconds</h3>
+          <p class="note">
+            Node only. No YubiKey, no Docker, no API keys, no network. This
+            verifies the committed record from a real ceremony.
+          </p>
+          <pre class="out">
+git clone https://github.com/getlarge/human-checkpoint
+cd human-checkpoint
+pnpm install --frozen-lockfile
+node scripts/verify-evidence.mjs</pre
+          >
+          <p class="note" style="margin: 14px 0 0">
+            Both signatures verify, the two request-scoped keys differ, and a
+            one-character change to the field note is rejected.
+          </p>
+        </div>
+
+        <h3>Run the full workflow</h3>
+        <p>You need all of this — the demo is deliberately not mockable:</p>
+        <ul class="plain">
+          <li>Node.js 22.19+ (24 recommended) and pnpm 10.29.3.</li>
+          <li>
+            Docker with AMD64 emulation. The pinned MoltNet images are AMD64;
+            Ory, Postgres, Redis and the object store run natively where
+            available.
+          </li>
+          <li>Ollama Cloud and Exa API keys, for the two real agent tasks.</li>
+          <li>
+            One YubiKey 5.8 that
+            <strong>advertises the previewSign extension</strong> — the firmware
+            version alone is not sufficient.
+          </li>
+        </ul>
+
+        <pre class="out">
+# 1. install, and supply the two external keys
+pnpm install --frozen-lockfile
+export OLLAMA_API_KEY='your-key'
+export EXA_API_KEY='your-key'
+
+# 2. provision everything: MoltNet, Ory, Postgres, Redis, object store,
+#    identities, team, diary, OAuth clients, runtime profile, seeded queue
+pnpm run setup:local
+
+# 3. start the dashboard, the agent worker and the signer companion
+pnpm run start:local
+
+# 4. open http://localhost:1880/</pre
+        >
+
+        <p class="note" style="margin-top: 20px">
+          <code>pnpm run setup:local</code> is idempotent and reuses existing
+          identities. <code>pnpm run infra:down</code> stops the containers,
+          keeping volumes. Enrolling the key — and why activation needs a second
+          person — is covered in <a href="#yubikey">How we use YubiKey 5.8</a>.
+        </p>
+      </div>
+    </section>
+
+    <section id="stack">
+      <div class="wrap">
+        <p class="kicker">Tech stack &amp; dependencies</p>
+        <h2>What it is built from</h2>
+        <div class="scroll-x">
+          <table>
+            <thead>
+              <tr>
+                <th style="width: 26%">Component</th>
+                <th style="width: 20%">Version</th>
+                <th>Role</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>YubiKey 5.8</strong></td>
+                <td>previewSign</td>
+                <td>
+                  The human decision. ARKG derives a key per signing request.
+                </td>
+              </tr>
+              <tr>
+                <td><code>@themoltnet/yubikey-preview-sign</code></td>
+                <td>0.4.0 · MIT</td>
+                <td>
+                  Enrollment, ARKG derivation, signing, offline verification.
+                </td>
+              </tr>
+              <tr>
+                <td><code>@themoltnet/ctap</code></td>
+                <td>0.2.0 · MIT</td>
+                <td>CTAP2/HID transport for Node.js.</td>
+              </tr>
+              <tr>
+                <td><code>@themoltnet/signer</code></td>
+                <td>0.2.0 · AGPL</td>
+                <td>Loopback companion bridging browser to key.</td>
+              </tr>
+              <tr>
+                <td><code>@themoltnet/sdk</code></td>
+                <td>0.128.0</td>
+                <td>Identities, teams, tasks, signing requests.</td>
+              </tr>
+              <tr>
+                <td><code>@themoltnet/agent-daemon</code></td>
+                <td>0.36.0</td>
+                <td>Task polling, leasing, runtime hosting.</td>
+              </tr>
+              <tr>
+                <td><code>@themoltnet/pi-runtime</code></td>
+                <td>0.6.0</td>
+                <td>Custom runtime and the single model-visible tool.</td>
+              </tr>
+              <tr>
+                <td><strong>Node-RED</strong> + FlowFuse Dashboard</td>
+                <td>5.0.1</td>
+                <td>
+                  Orchestration <em>and</em> the UI — one flow, no separate
+                  frontend.
+                </td>
+              </tr>
+              <tr>
+                <td><strong>SQLite</strong></td>
+                <td><code>node:sqlite</code></td>
+                <td>
+                  Durable workflow journal, idempotent steps, append-only
+                  events.
+                </td>
+              </tr>
+              <tr>
+                <td><strong>Ory</strong> Kratos / Hydra / Keto</td>
+                <td>—</td>
+                <td>Identity, OAuth/OIDC, and relation-based authorization.</td>
+              </tr>
+              <tr>
+                <td><strong>Exa</strong></td>
+                <td>API</td>
+                <td>
+                  The public-source lookup, reachable only within a signed
+                  scope.
+                </td>
+              </tr>
+              <tr>
+                <td><strong>Ollama Cloud</strong></td>
+                <td>API</td>
+                <td>Model provider for the two real agent tasks.</td>
+              </tr>
+              <tr>
+                <td>TypeScript · Vitest · Prettier</td>
+                <td>5.9.2 · 3.2.4</td>
+                <td>
+                  Four private workspace packages, checked by
+                  <code>pnpm run check</code>.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="note" style="margin-top: 16px">
+          The agent's sandbox allows exactly one outbound host,
+          <code>api.exa.ai</code>, with
+          <code>toolEnforcement: enforce</code> and no unattended shell. Full
+          provisioning detail is in
+          <a
+            href="https://github.com/getlarge/human-checkpoint/blob/main/docs/moltnet.md"
+            ><code>docs/moltnet.md</code></a
+          >.
         </p>
       </div>
     </section>
@@ -959,8 +1315,6 @@ Press “Verify both signatures” to run the checks in your browser.</pre
       (function setUpVideo() {
         const video = document.getElementById('demo-video');
         const figure = document.getElementById('video-figure');
-        const missing = document.getElementById('video-missing');
-        const caption = document.getElementById('video-caption');
 
         const embeddable = /(?:youtube\.com|youtu\.be|vimeo\.com)/i;
         if (VIDEO_URL && embeddable.test(VIDEO_URL)) {
@@ -979,21 +1333,20 @@ Press “Verify both signatures” to run the checks in your browser.</pre
         }
         if (VIDEO_URL) video.querySelector('source').src = VIDEO_URL;
 
-        // A missing file surfaces as an error on the last <source>; show the
-        // placeholder rather than a dead player.
-        video.addEventListener('error', reveal, true);
-        video.addEventListener('loadedmetadata', () => {
-          missing.hidden = true;
-        });
-        setTimeout(() => {
-          if (!video.videoWidth && video.networkState === 3) reveal();
-        }, 1200);
+        video.addEventListener('loadedmetadata', describe);
+        // This module is deferred, so metadata may already have loaded by the
+        // time the listener above is attached.
+        if (video.readyState >= 1) describe();
 
-        function reveal() {
-          if (!missing.hidden) return;
-          video.style.display = 'none';
-          caption.hidden = true;
-          missing.hidden = false;
+        // Tell readers the length and resolution before they commit to playing.
+        function describe() {
+          const meta = document.getElementById('video-meta');
+          if (!meta || !video.duration || !isFinite(video.duration)) return;
+          const mins = Math.floor(video.duration / 60);
+          const secs = String(Math.round(video.duration % 60)).padStart(2, '0');
+          meta.textContent = ` · ${mins}:${secs}${
+            video.videoHeight ? ` · ${video.videoHeight}p` : ''
+          }`;
         }
       })();
 
@@ -1019,9 +1372,9 @@ Press “Verify both signatures” to run the checks in your browser.</pre
           rail: 'Scope shown',
           title: 'The exact scope is put in front of the human',
           badge: 'Decision fixed',
-          body: 'The technician sees the precise equipment queries proposed, the allowed sites, the result limit, the reason, and a five-minute expiry.',
+          body: 'The technician sees the exact lookup that claiming will authorise: one fixed query for this asset model, the allowed manufacturer domains, a four-result limit, the reason, and a five-minute expiry.',
           detail:
-            'MoltNet canonicalises all of it to bytes now. Whatever gets signed is what is on screen — the scope cannot drift between display and approval.',
+            'The scope is a fixed policy attached to the asset model — the agent did not choose it and has not run. MoltNet canonicalises it to bytes now, so what gets signed is exactly what is on screen.',
           caps: [
             [false, 'Review approved service history'],
             [false, 'Search public equipment sources'],

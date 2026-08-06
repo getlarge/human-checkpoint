@@ -132,11 +132,17 @@ HID transport and no CTAP code. The package enforces that separation with its
 own `check:verify-isolation` script.
 
 That matters because verification should run where the hardware never goes: a CI
-job, an auditor's laptop, a server that never sees a YubiKey. Human Checkpoint's
-offline proof check and the [live verifier on this
-site](https://getlarge.github.io/human-checkpoint/#verify) both rely on it —
-the site loads a browser build of our verification path and checks real hardware
-signatures with no server, no companion, and no key.
+job, an auditor's laptop, a server that never sees a YubiKey. Human Checkpoint
+uses it twice: `scripts/verify-evidence.mjs` checks the committed record from
+Node, and the project site in [`docs/`](./) does the same work in a browser over
+a build of that verification path — no server, no companion, and no key.
+
+Run either locally:
+
+```bash
+node scripts/verify-evidence.mjs   # Node
+pnpm run site:serve                # then open the "Verify" section
+```
 
 `client.verifyDigest({ enrollment, verificationKey, digest, signature })` is the
 convenience form when you still hold the full records.

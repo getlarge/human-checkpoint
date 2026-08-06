@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080">
+  <rect width="1920" height="1080" fill="#f7faf8"/>
+  <rect x="124" y="150" width="10" height="700" rx="5" fill="#0d8c82"/>
+  <g font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif">
+    <text x="180" y="215" fill="#0d8c82" font-size="30" font-weight="700" letter-spacing="3">FIELD WORK · HUMAN DECISION</text>
+    <text x="180" y="350" fill="#172623" font-size="68" font-weight="700">The technician inspects the machine</text>
+    <text x="180" y="475" fill="#566a66" font-size="38">The AI brief is read-only. It guides the on-site checks,</text>
+    <text x="180" y="535" fill="#566a66" font-size="38">but it cannot decide what was actually found.</text>
+    <text x="180" y="635" fill="#566a66" font-size="38">After inspection, the technician records one append-only field note</text>
+    <text x="180" y="695" fill="#566a66" font-size="38">and locks the completed work order for approval.</text>
+    <rect x="180" y="770" width="1440" height="86" rx="10" fill="#fff5d6" stroke="#d8b44a"/>
+    <text x="214" y="824" fill="#765600" font-size="29" font-weight="600">Next: the second YubiKey touch signs the brief and field note as one exact decision.</text>
+  </g>
+</svg>

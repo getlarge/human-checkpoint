@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080">
+  <rect width="1920" height="1080" fill="#f7faf8"/>
+  <rect x="124" y="170" width="10" height="650" rx="5" fill="#0d8c82"/>
+  <g font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif">
+    <text x="180" y="225" fill="#0d8c82" font-size="30" font-weight="700" letter-spacing="3">HUMAN CHECKPOINT</text>
+    <text x="180" y="360" fill="#172623" font-size="64" font-weight="700">Setup completed before this recording</text>
+    <text x="180" y="480" fill="#566a66" font-size="38">One technician enrolled one YubiKey 5.8.</text>
+    <text x="180" y="550" fill="#566a66" font-size="38">The walkthrough begins with an assigned service request.</text>
+    <rect x="180" y="665" width="760" height="74" rx="10" fill="#fff5d6" stroke="#d8b44a"/>
+    <text x="214" y="713" fill="#765600" font-size="28" font-weight="600">Setup page  /dashboard/ui/hardware-setup</text>
+  </g>
+</svg>
