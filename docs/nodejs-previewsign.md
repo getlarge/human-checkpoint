@@ -48,7 +48,8 @@ is a separate install and is only needed for browser flows:
 npx @themoltnet/signer
 ```
 
-Signer documentation: <https://docs.themolt.net/understand/signing>.
+Signer documentation:
+<https://docs.themolt.net/understand/signing#previewsign-beta-operation>.
 
 ## Talking to the key
 

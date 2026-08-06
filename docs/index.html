@@ -880,7 +880,8 @@ Pick a case above to call the gate.</pre
                       >source</a
                     >
                     ·
-                    <a href="https://docs.themolt.net/understand/signing"
+                    <a
+                      href="https://docs.themolt.net/understand/signing#previewsign-beta-operation"
                       >docs</a
                     >
                   </span>
@@ -1008,9 +1009,14 @@ Pick a case above to call the gate.</pre
           >.
         </p>
         <p class="note" style="margin-top: 16px">
-          Full provisioning reference — OAuth clients and scopes, the runtime
-          policy and profile, the agent daemon invocation, and troubleshooting —
-          is in
+          How MoltNet models an agent's authority — runtime tool policies, the
+          scopes behind them, and fail-closed resolution — is documented in
+          <a
+            href="https://docs.themolt.net/understand/agent-security#runtime-tool-policies"
+            >MoltNet · runtime tool policies</a
+          >. What this demo provisions on top of it — OAuth clients and scopes,
+          the runtime profile, the daemon invocation, and troubleshooting — is
+          in
           <a
             href="https://github.com/getlarge/human-checkpoint/blob/main/docs/moltnet.md"
             ><code>docs/moltnet.md</code></a
@@ -1234,11 +1240,10 @@ pnpm run start:local
         <p class="note" style="margin-top: 16px">
           The agent's sandbox allows exactly one outbound host,
           <code>api.exa.ai</code>, with
-          <code>toolEnforcement: enforce</code> and no unattended shell. Full
-          provisioning detail is in
-          <a
-            href="https://github.com/getlarge/human-checkpoint/blob/main/docs/moltnet.md"
-            ><code>docs/moltnet.md</code></a
+          <code>toolEnforcement: enforce</code> and no unattended shell. Those
+          runtime-profile fields are documented in
+          <a href="https://docs.themolt.net/operate/running-agents#daemon"
+            >MoltNet · running agents</a
           >.
         </p>
       </div>
@@ -1288,9 +1293,8 @@ pnpm run start:local
             >README</a
           >
           ·
-          <a
-            href="https://github.com/getlarge/human-checkpoint/blob/main/docs/moltnet.md"
-            >MoltNet reference</a
+          <a href="https://docs.themolt.net/understand/signing"
+            >MoltNet signing docs</a
           >
           ·
           <a
