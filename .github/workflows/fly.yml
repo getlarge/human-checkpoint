@@ -1,0 +1,33 @@
+name: Deploy project site to Fly.io
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/**'
+      - 'Dockerfile.fly'
+      - 'fly.toml'
+      - '.github/workflows/fly.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fly-project-site
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: Install flyctl
+        uses: superfly/flyctl-actions/setup-flyctl@ed8efb33836e8b2096c7fd3ba1c8afe303ebbff1
+
+      - name: Deploy static project site
+        run: flyctl deploy --local-only --yes
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
