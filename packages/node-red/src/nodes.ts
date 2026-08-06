@@ -835,13 +835,26 @@ function arrayValue(value: unknown): unknown[] {
 
 function stringArray(value: unknown): string[] {
   if (typeof value === 'string' && value.trim()) return [value.trim()];
-  const values = Array.isArray(value)
-    ? value
-    : Object.values(recordValue(value) ?? {});
-  return values
-    .filter((item): item is string => typeof item === 'string')
-    .map((item) => item.trim())
-    .filter(Boolean);
+  if (Array.isArray(value)) {
+    return value.flatMap((item) => {
+      if (typeof item === 'string') return stringArray(item);
+      const record = recordValue(item);
+      if (!record) return [];
+      const parts = Object.values(record).flatMap(stringArray);
+      return parts.length ? [parts.join(' — ')] : [];
+    });
+  }
+  const record = recordValue(value);
+  if (!record) return [];
+  return Object.values(record).flatMap((item) => {
+    if (typeof item === 'string' || Array.isArray(item)) {
+      return stringArray(item);
+    }
+    const nested = recordValue(item);
+    if (!nested) return [];
+    const parts = Object.values(nested).flatMap(stringArray);
+    return parts.length ? [parts.join(' · ')] : [];
+  });
 }
 
 function taskProgressMessage(

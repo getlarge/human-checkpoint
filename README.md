@@ -82,6 +82,15 @@ is no separate static frontend and no parallel HTTP journey API. HTTP remains
 only where the browser needs a security boundary: OIDC, safe configuration,
 and the allowlisted MoltNet signing proxy.
 
+[![Human Checkpoint Node-RED flow](docs/demo-assets/screenshots/node-red-flow-overview.jpg)](docs/demo-assets/screenshots/node-red-flow-overview.jpg)
+
+The numbered lanes make the security boundary visible: claim the assigned
+request, prepare the technician brief, lock the field note, verify the signed
+release, then build and test the portable evidence record. A second
+[editor screenshot](docs/demo-assets/screenshots/node-red-flow-ui-and-nodes.jpg)
+shows the Human Checkpoint nodes and FlowFuse Dashboard layout beside that same
+flow.
+
 MoltNet remains authoritative for task attempts and signing requests. On a
 refresh or restart, the dashboard reconstructs its view from SQLite, re-fetches
 each linked MoltNet approval, and resumes an existing task ID instead of
@@ -285,7 +294,9 @@ YubiKey ceremony with mocked evidence in a submitted demo.
 
 - Submission form:
   <https://docs.google.com/forms/d/e/1FAIpQLSfaczYBBIYY9p3nJDQCmFmpZ0s8cHuhCbV8QP8I-mw5aOYI6A/viewform>
-- Demo video: `TODO: final public URL`
+- Live project site: <https://human-checkpoint-getlarge.fly.dev/>
+- Demo video:
+  <https://human-checkpoint-getlarge.fly.dev/demo-assets/walkthrough.mp4>
 - Permanent source: <https://github.com/getlarge/human-checkpoint/tree/v0.1.0>
 - Tagged source archive:
   <https://github.com/getlarge/human-checkpoint/archive/refs/tags/v0.1.0.zip>

@@ -222,10 +222,10 @@ FORM: A clearance ledger—one continuous operational record with a fixed eviden
               prepare the technician brief.
             </p>
             <button
-              :disabled="Boolean(busy)"
+              :disabled="Boolean(busy) || preparationInProgress"
               @click="act('continue-brief', 'The agent is preparing the technician brief.')"
             >
-              Start preparation
+              {{ preparationActionLabel }}
             </button>
           </section>
 
@@ -648,6 +648,26 @@ FORM: A clearance ledger—one continuous operational record with a fixed eviden
       },
       briefReady() {
         return Boolean(this.journey.brief.immutable);
+      },
+      preparationTasksCompleted() {
+        return (
+          this.journey.tasks.length >= 2 &&
+          this.journey.tasks.every((task) => task.status === 'completed')
+        );
+      },
+      preparationInProgress() {
+        return (
+          this.journey.tasks.length > 0 &&
+          !this.preparationTasksCompleted &&
+          this.journey.tasks.some((task) =>
+            ['queued', 'pending', 'claimed', 'running'].includes(task.status),
+          )
+        );
+      },
+      preparationActionLabel() {
+        if (this.preparationTasksCompleted) return 'Open prepared brief';
+        if (this.preparationInProgress) return 'Preparation in progress';
+        return 'Start preparation';
       },
       releaseStatus() {
         return this.journey.release.status || 'not-requested';

@@ -45,6 +45,19 @@ describe('dashboard artifact', () => {
     expect(source).not.toMatch(/localStorage|sessionStorage/);
   });
 
+  it('starts every FlowFuse component script with its default export', async () => {
+    const templates = await Promise.all(
+      ['request-queue', 'hardware-setup', 'technician-workspace'].map((name) =>
+        readFile(resolve(root, `templates/${name}.html`), 'utf8'),
+      ),
+    );
+
+    for (const template of templates) {
+      const script = template.match(/<script>\s*([\s\S]*?)<\/script>/)?.[1];
+      expect(script?.trimStart()).toMatch(/^export default\s*{/);
+    }
+  });
+
   it('uses technician-facing request and approval language', async () => {
     const [briefing, setup] = await Promise.all([
       readFile(resolve(root, 'templates/technician-workspace.html'), 'utf8'),
@@ -62,6 +75,8 @@ describe('dashboard artifact', () => {
     expect(setup).not.toContain('Service request SR-2048');
     expect(setup).not.toContain('Technical setup details');
     expect(setup).not.toContain('Why two touches');
+    expect(setup).not.toContain('{{ credential.label }}');
+    expect(setup).toContain('An enrolled YubiKey is active for this team');
     expect(setup).toContain('Activate as credential manager');
     expect(setup).toContain(
       'The person who enrolled this YubiKey cannot activate it.',

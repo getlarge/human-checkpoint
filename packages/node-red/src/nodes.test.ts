@@ -59,6 +59,47 @@ describe('normalizeTaskResult', () => {
     });
   });
 
+  it('normalizes nested brief findings into readable bullets', () => {
+    const rawBody = {
+      findings: {
+        assetDetails: {
+          assetId: 'CV-204',
+          model: 'Dorner 2100 Series End Drive',
+          manual: 'MAN-DORNER-2100-REV-J',
+        },
+        historicalComparisons: [
+          {
+            id: 'SR-1872',
+            summary: 'Belt drifted after washdown.',
+            confirmedResolution: 'Residue was removed from the spindle.',
+          },
+          {
+            id: 'SR-1938',
+            summary: 'Tracking changed after relocation.',
+            confirmedResolution: 'The frame was realigned.',
+          },
+        ],
+      },
+      questionsToCheck: ['Question one?', 'Question two?'],
+      unknowns: ['The cause remains unknown.'],
+    };
+
+    const normalized = normalizeTaskResult('technician-brief', {
+      accepted: true,
+      artifactBody: rawBody,
+    });
+
+    expect(normalized.changed).toBe(true);
+    expect(
+      (normalized.result as { artifactBody: { findings: string[] } })
+        .artifactBody.findings,
+    ).toEqual([
+      'CV-204 · Dorner 2100 Series End Drive · MAN-DORNER-2100-REV-J',
+      'SR-1872 — Belt drifted after washdown. — Residue was removed from the spindle.',
+      'SR-1938 — Tracking changed after relocation. — The frame was realigned.',
+    ]);
+  });
+
   it('leaves request-review results unchanged', () => {
     const result = { artifactBody: { findings: 'A finding.' } };
 

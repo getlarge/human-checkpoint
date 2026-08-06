@@ -35,10 +35,6 @@
         <template v-if="credential"
           ><dl>
             <div>
-              <dt>Label</dt>
-              <dd>{{ credential.label }}</dd>
-            </div>
-            <div>
               <dt>Method</dt>
               <dd>{{ credential.verificationMethod }}</dd>
             </div>
@@ -85,87 +81,6 @@
   </main>
 </template>
 <script>
-  class HardwareCompanion {
-    constructor(baseUrl) {
-      const url = new URL(baseUrl);
-      if (
-        url.protocol !== 'http:' ||
-        !['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname)
-      )
-        throw new Error('Signer companion must use a loopback HTTP URL');
-      this.baseUrl = url;
-      this.token = null;
-    }
-    async request(path, init, authenticated = true) {
-      const response = await fetch(new URL(path, this.baseUrl), {
-        ...init,
-        credentials: 'omit',
-        redirect: 'error',
-        headers: {
-          accept: 'application/json',
-          ...(init.body ? { 'content-type': 'application/json' } : {}),
-          ...(authenticated && this.token
-            ? { 'x-moltnet-signer-session': this.token }
-            : {}),
-        },
-      });
-      const body = await response.json().catch(() => ({}));
-      if (!response.ok)
-        throw new Error(
-          body.message || `Signer companion returned HTTP ${response.status}`,
-        );
-      return body;
-    }
-    async connect() {
-      const session = await this.request(
-        '/v1/sessions',
-        { method: 'POST' },
-        false,
-      );
-      this.token = session.token;
-    }
-    async complete(body, popup) {
-      if (!this.token) await this.connect();
-      const ceremony = await this.request('/v1/ceremonies', {
-        method: 'POST',
-        body: JSON.stringify(body),
-      });
-      if (!popup || popup.closed)
-        throw new Error('Allow the signer approval popup, then retry');
-      popup.location.replace(ceremony.approvalUrl);
-      popup.focus();
-      const deadline = Date.now() + 5 * 60 * 1000;
-      while (Date.now() < deadline) {
-        const result = await this.request(
-          `/v1/ceremonies/${ceremony.id}/result`,
-          { method: 'GET' },
-        );
-        if (result.status === 'completed') return result;
-        if (result.status === 'failed')
-          throw new Error(`${result.message} (${result.code})`);
-        await new Promise((resolve) => setTimeout(resolve, 500));
-      }
-      throw new Error('The signer ceremony expired. Start again.');
-    }
-  }
-  async function setupRequest(url, init = {}) {
-    const response = await fetch(url, {
-      credentials: 'same-origin',
-      ...init,
-      headers: {
-        accept: 'application/json',
-        ...(init.body ? { 'content-type': 'application/json' } : {}),
-      },
-    });
-    const body = await response.json().catch(() => ({}));
-    if (!response.ok)
-      throw new Error(
-        body.detail ||
-          body.error ||
-          `Request failed with HTTP ${response.status}`,
-      );
-    return body;
-  }
   export default {
     data() {
       return {
@@ -182,6 +97,88 @@
       this.load();
     },
     methods: {
+      createCompanion(baseUrl) {
+        const url = new URL(baseUrl);
+        if (
+          url.protocol !== 'http:' ||
+          !['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname)
+        )
+          throw new Error('Signer companion must use a loopback HTTP URL');
+        return {
+          baseUrl: url,
+          token: null,
+          async request(path, init, authenticated = true) {
+            const response = await fetch(new URL(path, this.baseUrl), {
+              ...init,
+              credentials: 'omit',
+              redirect: 'error',
+              headers: {
+                accept: 'application/json',
+                ...(init.body ? { 'content-type': 'application/json' } : {}),
+                ...(authenticated && this.token
+                  ? { 'x-moltnet-signer-session': this.token }
+                  : {}),
+              },
+            });
+            const body = await response.json().catch(() => ({}));
+            if (!response.ok)
+              throw new Error(
+                body.message ||
+                  `Signer companion returned HTTP ${response.status}`,
+              );
+            return body;
+          },
+          async connect() {
+            const session = await this.request(
+              '/v1/sessions',
+              { method: 'POST' },
+              false,
+            );
+            this.token = session.token;
+          },
+          async complete(body, popup) {
+            if (!this.token) await this.connect();
+            const ceremony = await this.request('/v1/ceremonies', {
+              method: 'POST',
+              body: JSON.stringify(body),
+            });
+            if (!popup || popup.closed)
+              throw new Error('Allow the signer approval popup, then retry');
+            popup.location.replace(ceremony.approvalUrl);
+            popup.focus();
+            const deadline = Date.now() + 5 * 60 * 1000;
+            while (Date.now() < deadline) {
+              const result = await this.request(
+                `/v1/ceremonies/${ceremony.id}/result`,
+                { method: 'GET' },
+              );
+              if (result.status === 'completed') return result;
+              if (result.status === 'failed')
+                throw new Error(`${result.message} (${result.code})`);
+              await new Promise((resolve) => setTimeout(resolve, 500));
+            }
+            throw new Error('The signer ceremony expired. Start again.');
+          },
+        };
+      },
+      async setupRequest(url, init = {}) {
+        const response = await fetch(url, {
+          credentials: 'same-origin',
+          ...init,
+          headers: {
+            accept: 'application/json',
+            ...(init.body ? { 'content-type': 'application/json' } : {}),
+          },
+        });
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok)
+          throw new Error(
+            body.detail ||
+              body.error ||
+              `Request failed with HTTP ${response.status}`,
+          );
+        return body;
+      },
       stateLabel(status) {
         return status === 'active'
           ? 'Ready to approve work'
@@ -193,12 +190,12 @@
         this.busy = true;
         this.error = '';
         try {
-          this.config = await setupRequest('/dashboard/api/config');
-          const companion = new HardwareCompanion(this.config.signerUrl);
+          this.config = await this.setupRequest('/dashboard/api/config');
+          const companion = this.createCompanion(this.config.signerUrl);
           await companion.connect();
           this.companion = companion;
           this.companionReady = true;
-          const list = await setupRequest(
+          const list = await this.setupRequest(
             '/dashboard/api/signing/crypto/signing-credentials?limit=100',
           );
           this.credential =
@@ -209,7 +206,7 @@
             null;
           this.notice =
             this.credential?.status === 'active'
-              ? 'This YubiKey is ready for request claims and work-order approvals.'
+              ? 'An enrolled YubiKey is active for this team and the local companion is connected.'
               : this.credential
                 ? 'Registration is complete. A team credential manager must activate this key once.'
                 : 'The companion is ready. Enroll the technician YubiKey to continue.';
@@ -238,7 +235,7 @@
             },
             popup,
           );
-          const registration = await setupRequest(
+          const registration = await this.setupRequest(
             '/dashboard/api/signing/crypto/signing-credentials/registrations',
             {
               method: 'POST',
@@ -260,7 +257,7 @@
             },
             popup,
           );
-          await setupRequest(
+          await this.setupRequest(
             `/dashboard/api/signing/crypto/signing-credentials/registrations/${registration.id}/complete`,
             {
               method: 'POST',
@@ -282,7 +279,7 @@
         this.busy = true;
         this.error = '';
         try {
-          await setupRequest(
+          await this.setupRequest(
             `/dashboard/api/signing/crypto/signing-credentials/${this.credential.id}/approve`,
             {
               method: 'POST',
