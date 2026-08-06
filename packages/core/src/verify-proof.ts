@@ -1,8 +1,11 @@
 #!/usr/bin/env node
 import { readFile } from 'node:fs/promises';
 import { verifyProofArtifact } from './proof.js';
+import { proofPathFromArguments } from './verify-proof-args.js';
 
-const path = process.argv[2];
+// pnpm forwards its own `--` separator through each nested run, so the first
+// real argument can be preceded by one or more of them.
+const path = proofPathFromArguments(process.argv.slice(2));
 if (!path) {
   console.error('Usage: verify-proof <human-checkpoint-proof.json>');
   process.exitCode = 2;

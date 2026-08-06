@@ -161,7 +161,14 @@ describe('offline proof', () => {
     const tampered = JSON.parse(JSON.stringify(artifact)) as typeof artifact;
     tampered.checkpoints[1].canonicalMessage =
       tampered.checkpoints[1].canonicalMessage.replace('Install', 'install');
-    expect(verifyProofArtifact(tampered).valid).toBe(false);
+    const report = verifyProofArtifact(tampered);
+    expect(report.valid).toBe(false);
+    expect(report.errors).toContain(
+      'request-scoped derived public keys could not be compared because a checkpoint failed verification',
+    );
+    expect(report.errors).not.toContain(
+      'request-scoped derived public keys are equal',
+    );
   });
 
   it('still fails if an attacker recomputes only the outer proof hash', () => {

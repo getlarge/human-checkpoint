@@ -78,7 +78,13 @@ export function verifyProofArtifact(value: unknown): ProofVerificationReport {
     );
     const keys = checkpoints.map((checkpoint) => checkpoint.derivedPublicKey);
     keysDiffer = Boolean(keys[0] && keys[1] && keys[0] !== keys[1]);
-    if (!keysDiffer)
+    // A failed checkpoint reports no derived key. Saying the keys are equal
+    // would be a false claim about evidence that was never compared.
+    if (!keys[0] || !keys[1])
+      errors.push(
+        'request-scoped derived public keys could not be compared because a checkpoint failed verification',
+      );
+    else if (!keysDiffer)
       errors.push('request-scoped derived public keys are equal');
   } catch (error) {
     errors.push(error instanceof Error ? error.message : String(error));
