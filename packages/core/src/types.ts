@@ -1,6 +1,5 @@
 export const CHECKPOINT_VERSION = 'human-checkpoint:v1' as const;
 export const PROOF_VERSION = 'human-checkpoint-proof:v1' as const;
-export const SERVICE_REQUEST_ID = 'SR-2048' as const;
 export const HARDWARE_METHOD = 'human-hardware-previewsign' as const;
 
 export type CheckpointName = 'research-authorization' | 'field-release';
@@ -8,7 +7,7 @@ export type CheckpointName = 'research-authorization' | 'field-release';
 export interface CheckpointEnvelope {
   v: typeof CHECKPOINT_VERSION;
   checkpoint: CheckpointName;
-  serviceRequestId: typeof SERVICE_REQUEST_ID;
+  serviceRequestId: string;
   teamId: string;
   payload: Record<string, unknown>;
 }
@@ -99,7 +98,7 @@ export interface ProofCheckpoint {
 
 export interface HumanCheckpointProof {
   format: typeof PROOF_VERSION;
-  serviceRequestId: typeof SERVICE_REQUEST_ID;
+  serviceRequestId: string;
   teamId: string;
   exportedAt: string;
   checkpoints: [ProofCheckpoint, ProofCheckpoint];

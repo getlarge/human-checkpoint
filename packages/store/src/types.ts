@@ -1,5 +1,20 @@
 export type SupportRequestStatus = 'open' | 'pending-review' | 'closed';
 
+export interface SupportRequestAttachment {
+  id: string;
+  supportRequestId: string;
+  mediaType: 'image/webp';
+  label: string;
+  altText: string;
+  byteLength: number;
+  sha256: string;
+  url: string;
+}
+
+export interface StoredSupportRequestAttachment extends SupportRequestAttachment {
+  content: Uint8Array;
+}
+
 export interface SupportRequest {
   id: string;
   customerId: string;
@@ -9,6 +24,7 @@ export interface SupportRequest {
   assetName: string;
   assetModel: string;
   summary: string;
+  description: string | null;
   priority: 'routine' | 'urgent';
   status: SupportRequestStatus;
   openedAt: string;
@@ -19,9 +35,11 @@ export interface SupportRequest {
   approvedForReuse: boolean;
   manualId: string;
   manualRevision: string;
+  attachments: SupportRequestAttachment[];
 }
 
 export type WorkflowState =
+  | 'assigned'
   | 'preparing'
   | 'waiting-for-public-source-approval'
   | 'researching'

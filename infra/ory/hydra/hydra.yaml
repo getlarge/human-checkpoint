@@ -20,8 +20,8 @@ urls:
   consent: http://localhost:1880/dashboard/auth/consent
   login: http://localhost:4455/login
   logout: http://localhost:4455/logout
-  error: http://localhost:1880/dashboard/hardware-setup/
-  post_logout_redirect: http://localhost:1880/dashboard/hardware-setup/
+  error: http://localhost:1880/dashboard/ui/hardware-setup
+  post_logout_redirect: http://localhost:1880/dashboard/ui/hardware-setup
 
 strategies:
   access_token: jwt

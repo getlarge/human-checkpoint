@@ -59,13 +59,32 @@ function createHumanCheckpointAuth(input) {
       request.humanCheckpointSession = session;
       return next();
     },
+    ioMiddleware: async (socket, next) => {
+      const session = readSession(
+        socket.handshake?.headers?.cookie,
+        input.cookieSecret,
+      );
+      if (!session || session.expiresAt <= Date.now()) {
+        return next(new Error('Human Checkpoint sign-in required'));
+      }
+      const allowed = await hasTeamAccess(
+        session.accessToken,
+        input,
+        authorizedTokens,
+      );
+      if (!allowed) {
+        return next(new Error('Human Checkpoint team access required'));
+      }
+      socket.humanCheckpointSession = session;
+      return next();
+    },
   };
 }
 
 const PUBLIC_AUTH_PATHS = new Set([
   '/dashboard/auth/login',
-  '/dashboard/auth/callback',
   '/dashboard/auth/consent',
+  '/dashboard/auth/callback',
   '/dashboard/api/session',
 ]);
 
@@ -150,7 +169,7 @@ function safeReturnTo(raw, input) {
       return `${url.pathname}${url.search}${url.hash}`;
     }
   } catch {}
-  return '/dashboard/requests/';
+  return '/dashboard/ui/requests';
 }
 
 function clearSession(response, expectedOrigin) {

@@ -1,12 +1,14 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, readFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { DatabaseSync, type StatementResultingChanges } from 'node:sqlite';
 
 import type {
   MoltNetTaskLink,
   SigningRequestLink,
+  StoredSupportRequestAttachment,
   SupportRequest,
+  SupportRequestAttachment,
   SupportRequestStatus,
   WorkflowEvent,
   WorkflowInstance,
@@ -45,9 +47,26 @@ export class HumanCheckpointStore {
     const insert = this.database.prepare(`
       INSERT OR IGNORE INTO support_requests (
         id, customer_id, customer_name, site_name, asset_id, asset_name, asset_model,
-        summary, priority, status, opened_at, closed_at, assigned_role, assigned_shift,
+        summary, description, priority, status, opened_at, closed_at, assigned_role, assigned_shift,
         confirmed_resolution, approved_for_reuse, manual_id, manual_revision
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    const updateDescription = this.database.prepare(`
+      UPDATE support_requests SET description = ?
+      WHERE id = ? AND (description IS NULL OR description = '')
+    `);
+    const insertAttachment = this.database.prepare(`
+      INSERT INTO support_request_attachments (
+        id, support_request_id, media_type, label, alt_text, content, sha256, sort_order
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(id) DO UPDATE SET
+        support_request_id = excluded.support_request_id,
+        media_type = excluded.media_type,
+        label = excluded.label,
+        alt_text = excluded.alt_text,
+        content = excluded.content,
+        sha256 = excluded.sha256,
+        sort_order = excluded.sort_order
     `);
     this.transaction(() => {
       for (const request of DEMO_REQUESTS) {
@@ -60,6 +79,7 @@ export class HumanCheckpointStore {
           request.assetName,
           request.assetModel,
           request.summary,
+          request.description ?? null,
           request.priority,
           request.status,
           request.openedAt,
@@ -70,6 +90,19 @@ export class HumanCheckpointStore {
           request.approvedForReuse ? 1 : 0,
           request.manualId,
           request.manualRevision,
+        );
+        updateDescription.run(request.description ?? null, request.id);
+      }
+      for (const attachment of DEMO_ATTACHMENTS) {
+        insertAttachment.run(
+          attachment.id,
+          attachment.supportRequestId,
+          attachment.mediaType,
+          attachment.label,
+          attachment.altText,
+          attachment.content,
+          attachment.sha256,
+          attachment.sortOrder,
         );
       }
     });
@@ -85,7 +118,7 @@ export class HumanCheckpointStore {
       : this.database
           .prepare('SELECT * FROM support_requests ORDER BY opened_at DESC')
           .all();
-    return rows.map((row) => supportRequest(row as Row));
+    return rows.map((row) => this.supportRequest(row as Row));
   }
 
   listSupportRequestsForCustomer(
@@ -111,14 +144,14 @@ export class HumanCheckpointStore {
           `,
           )
           .all(customerId);
-    return rows.map((row) => supportRequest(row as Row));
+    return rows.map((row) => this.supportRequest(row as Row));
   }
 
   getSupportRequest(id: string): SupportRequest | null {
     const row = this.database
       .prepare('SELECT * FROM support_requests WHERE id = ?')
       .get(id);
-    return row ? supportRequest(row as Row) : null;
+    return row ? this.supportRequest(row as Row) : null;
   }
 
   getSupportRequestForCustomer(
@@ -130,7 +163,7 @@ export class HumanCheckpointStore {
         'SELECT * FROM support_requests WHERE id = ? AND customer_id = ?',
       )
       .get(id, customerId);
-    return row ? supportRequest(row as Row) : null;
+    return row ? this.supportRequest(row as Row) : null;
   }
 
   listReusableHistory(requestId: string): SupportRequest[] {
@@ -148,7 +181,22 @@ export class HumanCheckpointStore {
       `,
       )
       .all(current.id, current.customerId, current.assetModel);
-    return rows.map((row) => supportRequest(row as Row));
+    return rows.map((row) => this.supportRequest(row as Row));
+  }
+
+  getSupportRequestAttachment(
+    id: string,
+  ): StoredSupportRequestAttachment | null {
+    const row = this.database
+      .prepare(
+        `
+        SELECT a.*, length(a.content) AS byte_length
+        FROM support_request_attachments a
+        WHERE a.id = ?
+      `,
+      )
+      .get(id);
+    return row ? storedAttachment(row as Row) : null;
   }
 
   startWorkflow(supportRequestId: string): WorkflowInstance {
@@ -175,7 +223,7 @@ export class HumanCheckpointStore {
           `
           INSERT INTO workflow_instances (
             id, support_request_id, state, current_step, version, created_at, updated_at
-          ) VALUES (?, ?, 'preparing', 'review-request', 1, ?, ?)
+          ) VALUES (?, ?, 'assigned', 'claim-request', 1, ?, ?)
         `,
         )
         .run(id, supportRequestId, now, now);
@@ -306,6 +354,34 @@ export class HumanCheckpointStore {
         )
         .run(JSON.stringify(result), completedAt, workflowId, stepKey);
       this.appendEventWithinTransaction(workflowId, 'step.completed', {
+        stepKey,
+      });
+      return this.requireStep(workflowId, stepKey);
+    });
+  }
+
+  replaceCompletedStepResult(
+    workflowId: string,
+    stepKey: string,
+    result: unknown,
+  ): WorkflowStep {
+    return this.transaction(() => {
+      const existing = this.requireStep(workflowId, stepKey);
+      if (existing.status !== 'completed') {
+        throw new Error(
+          `Step ${stepKey} must be completed before its result can be normalized`,
+        );
+      }
+      this.database
+        .prepare(
+          `
+          UPDATE workflow_steps
+          SET result_json = ?
+          WHERE workflow_id = ? AND step_key = ?
+        `,
+        )
+        .run(JSON.stringify(result), workflowId, stepKey);
+      this.appendEventWithinTransaction(workflowId, 'step.result_normalized', {
         stepKey,
       });
       return this.requireStep(workflowId, stepKey);
@@ -520,15 +596,45 @@ export class HumanCheckpointStore {
         'SELECT COALESCE(MAX(version), 0) AS version FROM schema_migrations',
       )
       .get() as Row;
-    if (Number(current.version) >= 1) return;
-    this.transaction(() => {
-      this.database.exec(SCHEMA_V1);
-      this.database
-        .prepare(
-          'INSERT INTO schema_migrations (version, applied_at) VALUES (1, ?)',
-        )
-        .run(this.timestamp());
-    });
+    let version = Number(current.version);
+    if (version < 1) {
+      this.transaction(() => {
+        this.database.exec(SCHEMA_V1);
+        this.database
+          .prepare(
+            'INSERT INTO schema_migrations (version, applied_at) VALUES (1, ?)',
+          )
+          .run(this.timestamp());
+      });
+      version = 1;
+    }
+    if (version < 2) {
+      this.transaction(() => {
+        this.database.exec(SCHEMA_V2);
+        this.database
+          .prepare(
+            'INSERT INTO schema_migrations (version, applied_at) VALUES (2, ?)',
+          )
+          .run(this.timestamp());
+      });
+    }
+  }
+
+  private supportRequest(row: Row): SupportRequest {
+    const request = supportRequest(row);
+    const attachments = this.database
+      .prepare(
+        `
+        SELECT id, support_request_id, media_type, label, alt_text,
+               length(content) AS byte_length, sha256
+        FROM support_request_attachments
+        WHERE support_request_id = ?
+        ORDER BY sort_order, id
+      `,
+      )
+      .all(request.id)
+      .map((attachment) => attachmentMetadata(attachment as Row));
+    return { ...request, attachments };
   }
 
   private requireSupportRequest(id: string): SupportRequest {
@@ -706,7 +812,28 @@ const SCHEMA_V1 = `
   );
 `;
 
-const DEMO_REQUESTS: SupportRequest[] = [
+const SCHEMA_V2 = `
+  ALTER TABLE support_requests ADD COLUMN description TEXT;
+
+  CREATE TABLE support_request_attachments (
+    id TEXT PRIMARY KEY,
+    support_request_id TEXT NOT NULL REFERENCES support_requests(id) ON DELETE CASCADE,
+    media_type TEXT NOT NULL CHECK(media_type IN ('image/webp')),
+    label TEXT NOT NULL,
+    alt_text TEXT NOT NULL,
+    content BLOB NOT NULL,
+    sha256 TEXT NOT NULL,
+    sort_order INTEGER NOT NULL DEFAULT 0
+  );
+  CREATE INDEX support_request_attachments_request_idx
+    ON support_request_attachments(support_request_id, sort_order);
+`;
+
+type DemoRequest = Omit<SupportRequest, 'attachments' | 'description'> & {
+  description?: string | null;
+};
+
+const DEMO_REQUESTS: DemoRequest[] = [
   {
     id: 'SR-2048',
     customerId: 'CUST-NORTH-WATER',
@@ -726,6 +853,112 @@ const DEMO_REQUESTS: SupportRequest[] = [
     approvedForReuse: false,
     manualId: 'MAN-SKF-CWP-200-REV-F',
     manualRevision: 'F',
+  },
+  {
+    id: 'SR-2075',
+    customerId: 'CUST-ASTER-COMPONENTS',
+    customerName: 'Aster Components',
+    siteName: 'Assembly Hall · Packing line 2',
+    assetId: 'CV-204',
+    assetName: 'Packaging conveyor CV-204',
+    assetModel: 'Dorner 2100 Series End Drive',
+    summary:
+      'Conveyor belt drifts toward the operator side after 10 to 15 minutes.',
+    description:
+      'Cartons begin rubbing the side guide after the conveyor has been running for several minutes. The line team re-centered the belt once, but the drift returned. Three reported photographs are attached; no guard has been removed.',
+    priority: 'routine',
+    status: 'open',
+    openedAt: '2026-08-05T07:40:00.000Z',
+    closedAt: null,
+    assignedRole: 'Field service technician',
+    assignedShift: 'Day / A',
+    confirmedResolution: null,
+    approvedForReuse: false,
+    manualId: 'MAN-DORNER-2100-REV-J',
+    manualRevision: '851-043 Rev. J',
+  },
+  {
+    id: 'SR-1872',
+    customerId: 'CUST-ASTER-COMPONENTS',
+    customerName: 'Aster Components',
+    siteName: 'Assembly Hall · Packing line 2',
+    assetId: 'CV-204',
+    assetName: 'Packaging conveyor CV-204',
+    assetModel: 'Dorner 2100 Series End Drive',
+    summary: 'Belt drifted toward the operator side after washdown.',
+    priority: 'routine',
+    status: 'closed',
+    openedAt: '2026-02-12T07:15:00.000Z',
+    closedAt: '2026-02-12T15:44:00.000Z',
+    assignedRole: 'Field service technician',
+    assignedShift: 'Day / A',
+    confirmedResolution:
+      'Residue was removed from the drive spindle; tracking was then observed under load for 30 minutes.',
+    approvedForReuse: true,
+    manualId: 'MAN-DORNER-2100-REV-J',
+    manualRevision: '851-043 Rev. J',
+  },
+  {
+    id: 'SR-1938',
+    customerId: 'CUST-ASTER-COMPONENTS',
+    customerName: 'Aster Components',
+    siteName: 'Assembly Hall · Packing line 1',
+    assetId: 'CV-118',
+    assetName: 'Packaging conveyor CV-118',
+    assetModel: 'Dorner 2100 Series End Drive',
+    summary: 'Tracking changed after the packing line was relocated.',
+    priority: 'routine',
+    status: 'closed',
+    openedAt: '2026-05-04T08:20:00.000Z',
+    closedAt: '2026-05-04T14:36:00.000Z',
+    assignedRole: 'Mechanical maintenance technician',
+    assignedShift: 'Late / B',
+    confirmedResolution:
+      'The mounting surface and frame were found out of plane; the frame was realigned and tracking verified under load.',
+    approvedForReuse: true,
+    manualId: 'MAN-DORNER-2100-REV-J',
+    manualRevision: '851-043 Rev. J',
+  },
+  {
+    id: 'SR-2010',
+    customerId: 'CUST-ASTER-COMPONENTS',
+    customerName: 'Aster Components',
+    siteName: 'Assembly Hall · Packing line 1',
+    assetId: 'CV-118',
+    assetName: 'Packaging conveyor CV-118',
+    assetModel: 'Dorner 2100 Series End Drive',
+    summary: 'Conveyor stopped under load and restarted after cartons cleared.',
+    priority: 'urgent',
+    status: 'closed',
+    openedAt: '2026-06-18T10:12:00.000Z',
+    closedAt: '2026-06-18T13:40:00.000Z',
+    assignedRole: 'Mechanical maintenance technician',
+    assignedShift: 'Day / A',
+    confirmedResolution:
+      'A damaged timing belt was replaced. No belt-tracking symptom was recorded.',
+    approvedForReuse: true,
+    manualId: 'MAN-DORNER-2100-REV-J',
+    manualRevision: '851-043 Rev. J',
+  },
+  {
+    id: 'SR-2051',
+    customerId: 'CUST-ASTER-COMPONENTS',
+    customerName: 'Aster Components',
+    siteName: 'Assembly Hall · Packing line 2',
+    assetId: 'CV-204',
+    assetName: 'Packaging conveyor CV-204',
+    assetModel: 'Dorner 2100 Series End Drive',
+    summary: 'Recurring operator-side drift; outcome awaiting review.',
+    priority: 'routine',
+    status: 'pending-review',
+    openedAt: '2026-07-29T12:05:00.000Z',
+    closedAt: null,
+    assignedRole: 'Field service technician',
+    assignedShift: 'Day / A',
+    confirmedResolution: null,
+    approvedForReuse: false,
+    manualId: 'MAN-DORNER-2100-REV-J',
+    manualRevision: '851-043 Rev. J',
   },
   {
     id: 'SR-1172',
@@ -810,6 +1043,48 @@ const DEMO_REQUESTS: SupportRequest[] = [
     manualRevision: 'F',
   },
   {
+    id: 'SR-2063',
+    customerId: 'CUST-NORTH-WATER',
+    customerName: 'North River Water',
+    siteName: 'Central treatment plant',
+    assetId: 'C-0012',
+    assetName: 'Instrument-air compressor C-12',
+    assetModel: 'Atlas Copco GA37',
+    summary:
+      'Discharge temperature reaches 108 °C within twenty minutes of loading.',
+    priority: 'urgent',
+    status: 'pending-review',
+    openedAt: '2026-08-01T14:25:00.000Z',
+    closedAt: null,
+    assignedRole: 'Mechanical maintenance technician',
+    assignedShift: 'Day / A',
+    confirmedResolution: null,
+    approvedForReuse: false,
+    manualId: 'MAN-ATLAS-GA37-REV-C',
+    manualRevision: 'C',
+  },
+  {
+    id: 'SR-1714',
+    customerId: 'CUST-NORTH-WATER',
+    customerName: 'North River Water',
+    siteName: 'Administration building',
+    assetId: 'AHU-0003',
+    assetName: 'Air-handling unit AHU-3',
+    assetModel: 'Trane Performance Climate Changer',
+    summary: 'Supply airflow fell below the occupied-hours setpoint.',
+    priority: 'routine',
+    status: 'closed',
+    openedAt: '2026-06-03T08:10:00.000Z',
+    closedAt: '2026-06-03T12:46:00.000Z',
+    assignedRole: 'Building systems technician',
+    assignedShift: 'Day / A',
+    confirmedResolution:
+      'Loose supply-fan belt replaced and airflow verified at the local controller.',
+    approvedForReuse: true,
+    manualId: 'MAN-TRANE-PCC-REV-B',
+    manualRevision: 'B',
+  },
+  {
     id: 'SR-1902',
     customerId: 'CUST-SOUTH-ENERGY',
     customerName: 'South Basin Energy',
@@ -832,6 +1107,62 @@ const DEMO_REQUESTS: SupportRequest[] = [
   },
 ];
 
+type DemoAttachment = StoredSupportRequestAttachment & { sortOrder: number };
+
+const DEMO_ATTACHMENTS: DemoAttachment[] = [
+  fixtureAttachment({
+    id: 'ATT-881',
+    supportRequestId: 'SR-2075',
+    filename: 'att-881-operator-side-belt-edge.webp',
+    label: 'Operator-side belt edge',
+    altText:
+      'Close view of the blue conveyor belt beside the operator-side stainless guide.',
+    sortOrder: 1,
+  }),
+  fixtureAttachment({
+    id: 'ATT-882',
+    supportRequestId: 'SR-2075',
+    filename: 'att-882-drive-end-spindle.webp',
+    label: 'Drive-end spindle',
+    altText: 'Close view of the conveyor drive-end cover, bearing, and belt.',
+    sortOrder: 2,
+  }),
+  fixtureAttachment({
+    id: 'ATT-883',
+    supportRequestId: 'SR-2075',
+    filename: 'att-883-conveyor-frame-guide.webp',
+    label: 'Conveyor frame and guide',
+    altText:
+      'Wider view of the conveyor frame, blue belt, and side-guide arrangement.',
+    sortOrder: 3,
+  }),
+];
+
+function fixtureAttachment(input: {
+  id: string;
+  supportRequestId: string;
+  filename: string;
+  label: string;
+  altText: string;
+  sortOrder: number;
+}): DemoAttachment {
+  const content = readFileSync(
+    new URL(`../fixtures/attachments/${input.filename}`, import.meta.url),
+  );
+  return {
+    id: input.id,
+    supportRequestId: input.supportRequestId,
+    mediaType: 'image/webp',
+    label: input.label,
+    altText: input.altText,
+    byteLength: content.byteLength,
+    sha256: createHash('sha256').update(content).digest('hex'),
+    url: `/dashboard/api/attachments/${encodeURIComponent(input.id)}`,
+    content,
+    sortOrder: input.sortOrder,
+  };
+}
+
 function supportRequest(row: Row): SupportRequest {
   return {
     id: String(row.id),
@@ -842,6 +1173,7 @@ function supportRequest(row: Row): SupportRequest {
     assetName: String(row.asset_name),
     assetModel: String(row.asset_model),
     summary: String(row.summary),
+    description: nullableString(row.description),
     priority: row.priority as SupportRequest['priority'],
     status: row.status as SupportRequestStatus,
     openedAt: String(row.opened_at),
@@ -852,7 +1184,29 @@ function supportRequest(row: Row): SupportRequest {
     approvedForReuse: Number(row.approved_for_reuse) === 1,
     manualId: String(row.manual_id),
     manualRevision: String(row.manual_revision),
+    attachments: [],
   };
+}
+
+function attachmentMetadata(row: Row): SupportRequestAttachment {
+  return {
+    id: String(row.id),
+    supportRequestId: String(row.support_request_id),
+    mediaType: row.media_type as SupportRequestAttachment['mediaType'],
+    label: String(row.label),
+    altText: String(row.alt_text),
+    byteLength: Number(row.byte_length),
+    sha256: String(row.sha256),
+    url: `/dashboard/api/attachments/${encodeURIComponent(String(row.id))}`,
+  };
+}
+
+function storedAttachment(row: Row): StoredSupportRequestAttachment {
+  const content = row.content;
+  if (!(content instanceof Uint8Array)) {
+    throw new Error('Stored request attachment is not binary data');
+  }
+  return { ...attachmentMetadata(row), content };
 }
 
 function workflowInstance(row: Row): WorkflowInstance {

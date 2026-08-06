@@ -208,7 +208,10 @@ const dashboardClient = await requestJson(`${hydraAdminUrl}/admin/clients`, {
     response_types: ['code'],
     token_endpoint_auth_method: 'client_secret_post',
     redirect_uris: [`${dashboardOrigin}/dashboard/auth/callback`],
-    post_logout_redirect_uris: [`${dashboardOrigin}/dashboard/hardware-setup/`],
+    post_logout_redirect_uris: [
+      `${dashboardOrigin}/dashboard/ui/hardware-setup`,
+    ],
+    skip_consent: true,
     scope: 'openid offline_access human:profile team:read crypto:sign',
     metadata: { type: 'human_checkpoint_dashboard', team_id: teamId },
   }),
@@ -392,9 +395,9 @@ function writeApplicationEnv({ identity, dashboard }) {
     HUMAN_CHECKPOINT_SIGNER_URL: 'http://127.0.0.1:17373',
     HUMAN_CHECKPOINT_PORT: '1880',
     HUMAN_CHECKPOINT_ORIGIN: dashboardOrigin,
-    HUMAN_CHECKPOINT_DEMO_CUSTOMER_ID: 'CUST-NORTH-WATER',
+    HUMAN_CHECKPOINT_DEMO_CUSTOMER_IDS:
+      'CUST-NORTH-WATER,CUST-ASTER-COMPONENTS',
     HUMAN_CHECKPOINT_HYDRA_ADMIN_URL: hydraAdminUrl,
-    HUMAN_CHECKPOINT_LOCAL_AUTO_CONSENT: 'true',
     MOLTNET_AGENT_NAME: agentName,
     MOLTNET_API_URL: apiUrl,
     GIT_CONFIG_GLOBAL: gitconfig,

@@ -16,6 +16,10 @@ const { createHumanCheckpointAuth } = require('../auth-middleware.cjs') as {
       response: MockResponse,
       next: () => void,
     ): Promise<void>;
+    ioMiddleware(
+      socket: Record<string, unknown>,
+      next: (error?: Error) => void,
+    ): Promise<void>;
   };
 };
 
@@ -40,7 +44,7 @@ describe('dashboard authentication middleware', () => {
     await auth.middleware(
       {
         method: 'GET',
-        originalUrl: '/dashboard/requests/',
+        originalUrl: '/dashboard/ui/requests',
         headers: { accept: 'text/html' },
       },
       response,
@@ -51,14 +55,14 @@ describe('dashboard authentication middleware', () => {
     expect(response.redirectUrl).toContain('/dashboard/auth/login?return_to=');
   });
 
-  it('rejects unauthenticated workflow APIs without redirecting', async () => {
+  it('rejects unauthenticated protected APIs without redirecting', async () => {
     const auth = configuredAuth();
     const response = mockResponse();
 
     await auth.middleware(
       {
         method: 'POST',
-        originalUrl: '/dashboard/api/requests/SR-2048/workflow',
+        originalUrl: '/dashboard/api/signing/crypto/signing-requests',
         headers: { accept: 'application/json' },
       },
       response,
@@ -69,30 +73,7 @@ describe('dashboard authentication middleware', () => {
     expect(response.body).toContain('Sign in');
   });
 
-  it('fails closed when local authentication has not been bootstrapped', async () => {
-    const auth = createHumanCheckpointAuth({
-      cookieSecret: '',
-      expectedOrigin: 'http://127.0.0.1:1880',
-      moltNetUrl: '',
-      teamId: '',
-    });
-    const response = mockResponse();
-
-    await auth.middleware(
-      {
-        method: 'GET',
-        originalUrl: '/dashboard/requests/',
-        headers: { accept: 'text/html' },
-      },
-      response,
-      vi.fn(),
-    );
-
-    expect(response.statusCode).toBe(503);
-    expect(response.body).toContain('not configured');
-  });
-
-  it('allows only the local OIDC consent callback through before sign-in', async () => {
+  it('allows Hydra to reach the local consent handler before login completes', async () => {
     const auth = configuredAuth();
     const response = mockResponse();
     const next = vi.fn();
@@ -110,6 +91,29 @@ describe('dashboard authentication middleware', () => {
 
     expect(next).toHaveBeenCalledOnce();
     expect(response.redirectUrl).toBeUndefined();
+  });
+
+  it('fails closed when local authentication has not been bootstrapped', async () => {
+    const auth = createHumanCheckpointAuth({
+      cookieSecret: '',
+      expectedOrigin: 'http://127.0.0.1:1880',
+      moltNetUrl: '',
+      teamId: '',
+    });
+    const response = mockResponse();
+
+    await auth.middleware(
+      {
+        method: 'GET',
+        originalUrl: '/dashboard/ui/requests',
+        headers: { accept: 'text/html' },
+      },
+      response,
+      vi.fn(),
+    );
+
+    expect(response.statusCode).toBe(503);
+    expect(response.body).toContain('not configured');
   });
 
   it('checks MoltNet team access before allowing a sealed session', async () => {
@@ -132,7 +136,7 @@ describe('dashboard authentication middleware', () => {
     await auth.middleware(
       {
         method: 'GET',
-        originalUrl: '/dashboard/requests/',
+        originalUrl: '/dashboard/ui/requests',
         headers: { accept: 'text/html', cookie: `hc_session=${session}` },
       },
       response,
@@ -146,6 +150,29 @@ describe('dashboard authentication middleware', () => {
       }),
     );
     expect(next).toHaveBeenCalledOnce();
+  });
+
+  it('applies the same sealed session and team check to dashboard sockets', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true }));
+    const secret = 'a-test-cookie-secret-with-at-least-thirty-two-characters';
+    const session = seal(
+      { accessToken: 'socket-token', expiresAt: Date.now() + 60_000 },
+      secret,
+    );
+    const auth = createHumanCheckpointAuth({
+      cookieSecret: secret,
+      expectedOrigin: 'http://127.0.0.1:1880',
+      moltNetUrl: 'http://127.0.0.1:8080',
+      teamId: 'team-1',
+    });
+    const next = vi.fn();
+
+    await auth.ioMiddleware(
+      { handshake: { headers: { cookie: `hc_session=${session}` } } },
+      next,
+    );
+
+    expect(next).toHaveBeenCalledWith();
   });
 });
 

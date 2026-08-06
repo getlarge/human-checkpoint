@@ -1,0 +1,352 @@
+<template>
+  <main class="queue-workspace">
+    <header>
+      <div>
+        <p class="product">Human Checkpoint</p>
+        <h1>Service requests</h1>
+        <p>
+          Open assigned work, see what needs review, or look back at completed
+          requests.
+        </p>
+      </div>
+      <a class="secondary" href="/dashboard/ui/hardware-setup">YubiKey setup</a>
+    </header>
+    <div v-if="error" class="notice" role="alert">{{ error }}</div>
+    <section class="queue-panel">
+      <div class="queue-heading">
+        <div>
+          <h2>Demo service team</h2>
+          <p>
+            {{ filtered.length }} {{ activeLabel.toLowerCase() }} request{{
+            filtered.length === 1 ? '' : 's' }}
+          </p>
+        </div>
+        <nav aria-label="Request status">
+          <button
+            v-for="status in statuses"
+            :key="status.value"
+            :aria-pressed="active === status.value"
+            @click="active = status.value"
+          >
+            {{ status.label }} <strong>{{ count(status.value) }}</strong>
+          </button>
+        </nav>
+      </div>
+      <div class="request-list">
+        <article
+          v-for="request in filtered"
+          :key="request.id"
+          :class="{ 'with-evidence': request.attachments?.length }"
+        >
+          <div class="request-copy">
+            <div class="request-top">
+              <strong>{{ request.id }}</strong
+              ><span>{{ label(request.status) }}</span>
+            </div>
+            <p class="customer">{{ request.customerName }}</p>
+            <h3>{{ request.assetName }}</h3>
+            <p>{{ request.summary }}</p>
+            <small
+              >{{ request.siteName }} · Asset {{ request.assetId }} · {{
+              date(request.openedAt) }}</small
+            >
+            <p v-if="request.confirmedResolution" class="outcome">
+              Recorded outcome: {{ request.confirmedResolution }}
+            </p>
+            <button
+              v-if="request.status === 'open'"
+              :disabled="busy"
+              @click="openRequest(request.id)"
+            >
+              Open assigned request
+            </button>
+          </div>
+          <figure v-if="request.attachments?.length" class="request-evidence">
+            <img
+              :src="request.attachments[0].url"
+              :alt="request.attachments[0].altText"
+              loading="lazy"
+            />
+            <figcaption>
+              <strong>{{ request.attachments.length }} reported photos</strong>
+              <span>Request evidence · not analyzed by the agent</span>
+            </figcaption>
+          </figure>
+        </article>
+      </div>
+    </section>
+  </main>
+</template>
+<script>
+  export default {
+    data() {
+      return { requests: [], active: 'open', busy: false, error: '' };
+    },
+    computed: {
+      statuses() {
+        return [
+          { value: 'open', label: 'Open' },
+          { value: 'pending-review', label: 'Pending review' },
+          { value: 'closed', label: 'Closed' },
+        ];
+      },
+      activeLabel() {
+        return (
+          this.statuses.find((item) => item.value === this.active)?.label ||
+          this.active
+        );
+      },
+      filtered() {
+        return this.requests.filter(
+          (request) => request.status === this.active,
+        );
+      },
+    },
+    watch: {
+      msg: {
+        handler(message) {
+          const payload = message?.payload;
+          if (payload?.kind === 'human-checkpoint:request-queue') {
+            this.requests = payload.requests || [];
+            this.busy = false;
+            this.error = '';
+          }
+          if (payload?.kind === 'human-checkpoint:navigate')
+            window.location.assign(payload.url);
+          if (payload?.kind === 'human-checkpoint:error') {
+            this.error = payload.detail;
+            this.busy = false;
+          }
+        },
+      },
+    },
+    mounted() {
+      this.send({ topic: 'load-request-queue' });
+    },
+    methods: {
+      count(status) {
+        return this.requests.filter((request) => request.status === status)
+          .length;
+      },
+      label(status) {
+        return status === 'pending-review'
+          ? 'Pending review'
+          : status.charAt(0).toUpperCase() + status.slice(1);
+      },
+      date(value) {
+        return new Intl.DateTimeFormat(undefined, {
+          dateStyle: 'medium',
+        }).format(new Date(value));
+      },
+      openRequest(requestId) {
+        this.busy = true;
+        this.error = '';
+        this.send({ topic: 'open-request', payload: { requestId } });
+      },
+    },
+  };
+</script>
+<style>
+  .queue-workspace {
+    --ink: #14211f;
+    --muted: #536763;
+    --line: #c9d5d2;
+    --teal: #087f78;
+    max-width: 1120px;
+    margin: 0 auto;
+    padding: 30px;
+    color: var(--ink);
+    font-family: 'Avenir Next', Avenir, 'Segoe UI', sans-serif;
+  }
+  .queue-workspace > header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 24px;
+    padding-bottom: 24px;
+    border-bottom: 1px solid var(--line);
+  }
+  .product {
+    margin: 0;
+    color: var(--teal);
+    font-weight: 750;
+  }
+  .queue-workspace h1 {
+    margin: 4px 0 8px;
+    font-size: 36px;
+    letter-spacing: -0.025em;
+  }
+  .queue-workspace header p:last-child,
+  .queue-heading p {
+    margin: 0;
+    color: var(--muted);
+  }
+  .secondary,
+  .queue-workspace button {
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 10px 14px;
+    background: #fff;
+    color: var(--ink);
+    font: inherit;
+    font-weight: 700;
+    text-decoration: none;
+    cursor: pointer;
+  }
+  .queue-workspace :focus-visible {
+    outline: 3px solid #54b8b2;
+    outline-offset: 3px;
+  }
+  .queue-panel {
+    margin-top: 24px;
+    padding: 24px;
+    border-radius: 12px;
+    background: #fff;
+    box-shadow: 0 8px 24px rgba(20, 33, 31, 0.07);
+  }
+  .queue-heading {
+    display: flex;
+    justify-content: space-between;
+    gap: 24px;
+    align-items: flex-end;
+  }
+  .queue-heading h2 {
+    margin: 0 0 4px;
+  }
+  .queue-heading nav {
+    display: flex;
+    gap: 8px;
+  }
+  .queue-heading button[aria-pressed='true'] {
+    border-color: var(--teal);
+    background: var(--teal);
+    color: #fff;
+  }
+  .queue-heading button strong {
+    margin-left: 8px;
+  }
+  .request-list {
+    display: grid;
+    gap: 14px;
+    margin-top: 22px;
+  }
+  .request-list article {
+    padding: 20px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+  }
+  .request-list article.with-evidence {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 250px;
+    gap: 24px;
+    align-items: stretch;
+  }
+  .request-copy {
+    min-width: 0;
+  }
+  .request-top {
+    display: flex;
+    justify-content: space-between;
+  }
+  .request-top span {
+    color: var(--teal);
+    font-weight: 700;
+  }
+  .request-list h3 {
+    margin: 5px 0 6px;
+  }
+  .request-list p {
+    color: var(--muted);
+  }
+  .request-list small {
+    color: var(--muted);
+  }
+  .customer {
+    margin: 12px 0 0;
+    color: var(--teal) !important;
+    font-size: 0.82rem;
+    font-weight: 750;
+  }
+  .request-copy > button {
+    margin-top: 14px;
+    border-color: var(--teal);
+    background: var(--teal);
+    color: #fff;
+  }
+  .outcome {
+    padding-top: 12px;
+    border-top: 1px solid var(--line);
+  }
+  .request-evidence {
+    position: relative;
+    min-height: 180px;
+    margin: 0;
+    overflow: hidden;
+    border-radius: 8px;
+    background: #e9efed;
+  }
+  .request-evidence img {
+    width: 100%;
+    height: 100%;
+    min-height: 180px;
+    object-fit: cover;
+  }
+  .request-evidence figcaption {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    padding: 10px 14px 12px;
+    background: rgba(20, 33, 31, 0.9);
+    color: #fff;
+  }
+  .request-evidence figcaption strong,
+  .request-evidence figcaption span {
+    display: block;
+  }
+  .request-evidence figcaption span {
+    margin-top: 3px;
+    color: #e9efed;
+    font-size: 0.75rem;
+  }
+  .notice {
+    margin-top: 18px;
+    padding: 14px 18px;
+    border-radius: 8px;
+    background: #fdebea;
+    color: #8c2d2d;
+  }
+  @media (max-width: 720px) {
+    .queue-workspace {
+      padding: 16px;
+    }
+    .queue-workspace > header,
+    .queue-heading {
+      display: block;
+    }
+    .secondary {
+      display: inline-block;
+      margin-top: 16px;
+    }
+    .queue-heading nav {
+      display: grid;
+      margin-top: 18px;
+    }
+    .request-top {
+      gap: 12px;
+    }
+    .request-list article.with-evidence {
+      grid-template-columns: 1fr;
+    }
+    .request-evidence {
+      min-height: 220px;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .queue-workspace * {
+      scroll-behavior: auto !important;
+      transition: none !important;
+      animation: none !important;
+    }
+  }
+</style>

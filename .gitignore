@@ -7,5 +7,6 @@ out-tsc/
 .pi/npm/
 .node-red/
 .config.*.json*
+.sessions.json*
 coverage/
 *.log

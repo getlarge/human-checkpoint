@@ -31,6 +31,7 @@ describe('canonical JSON', () => {
   it('rejects non-canonical re-encoding and unknown envelope fields', () => {
     const { canonicalMessage } = createCheckpointEnvelope(
       'research-authorization',
+      'SR-2048',
       'team-1',
       {
         externalTool: 'exa',
@@ -52,5 +53,32 @@ describe('canonical JSON', () => {
     expect(() => parseCheckpointEnvelope(canonicalJson(injected))).toThrow(
       /unknown or missing/,
     );
+  });
+
+  it('binds the actual service request and rejects malformed request IDs', () => {
+    const payload = {
+      externalTool: 'exa' as const,
+      queries: ['Dorner 2100 belt tracking guidance'],
+      allowedDomains: ['dornerconveyors.com'],
+      maxResults: 3,
+      reason: 'Prepare the claimed conveyor request',
+      authorizationExpiresAt: '2030-01-01T00:00:00.000Z',
+    };
+    expect(
+      createCheckpointEnvelope(
+        'research-authorization',
+        'SR-2075',
+        'team-1',
+        payload,
+      ).envelope.serviceRequestId,
+    ).toBe('SR-2075');
+    expect(() =>
+      createCheckpointEnvelope(
+        'research-authorization',
+        '../SR-2075',
+        'team-1',
+        payload,
+      ),
+    ).toThrow(/envelope identity/);
   });
 });

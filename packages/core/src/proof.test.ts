@@ -106,6 +106,7 @@ function completedRequest(input: {
 describe('offline proof', () => {
   const researchMessage = createCheckpointEnvelope(
     'research-authorization',
+    'SR-2048',
     'team-1',
     {
       externalTool: 'exa',
@@ -116,16 +117,21 @@ describe('offline proof', () => {
       authorizationExpiresAt: '2030-01-01T00:00:00.000Z',
     },
   ).canonicalMessage;
-  const releaseMessage = createCheckpointEnvelope('field-release', 'team-1', {
-    brief: {
-      finding: 'Inspect coupling alignment before returning to service.',
+  const releaseMessage = createCheckpointEnvelope(
+    'field-release',
+    'SR-2048',
+    'team-1',
+    {
+      brief: {
+        finding: 'Inspect coupling alignment before returning to service.',
+      },
+      fieldAmendment:
+        'Install a temporary exclusion marker at the south access point.',
+      disposition: 'accepted-with-field-amendment',
+      role: 'Lead field technician',
+      shift: 'Day / A',
     },
-    fieldAmendment:
-      'Install a temporary exclusion marker at the south access point.',
-    disposition: 'accepted-with-field-amendment',
-    role: 'Lead field technician',
-    shift: 'Day / A',
-  }).canonicalMessage;
+  ).canonicalMessage;
   const artifact = createProofBundle({
     teamId: 'team-1',
     research: completedRequest({
@@ -184,5 +190,40 @@ describe('offline proof', () => {
 
   it('serializes without hidden non-canonical values', () => {
     expect(() => canonicalJson(artifact)).not.toThrow();
+  });
+
+  it('refuses to combine approvals from different service requests', () => {
+    const otherRelease = createCheckpointEnvelope(
+      'field-release',
+      'SR-2075',
+      'team-1',
+      {
+        brief: { finding: 'Review belt tracking evidence.' },
+        fieldAmendment: 'Keep the conveyor isolated pending inspection.',
+        disposition: 'accepted-with-field-amendment',
+        role: 'Field service technician',
+        shift: 'Day / A',
+      },
+    ).canonicalMessage;
+
+    expect(() =>
+      createProofBundle({
+        teamId: 'team-1',
+        research: completedRequest({
+          checkpoint: 'research-authorization',
+          message: researchMessage,
+          purpose: 'human-checkpoint:research-authorization',
+          id: '11111111-1111-4111-8111-111111111111',
+          secretByte: 7,
+        }),
+        release: completedRequest({
+          checkpoint: 'field-release',
+          message: otherRelease,
+          purpose: 'human-checkpoint:field-release',
+          id: '22222222-2222-4222-8222-222222222222',
+          secretByte: 8,
+        }),
+      }),
+    ).toThrow(/different service requests/);
   });
 });

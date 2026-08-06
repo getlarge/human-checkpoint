@@ -1,7 +1,6 @@
 import { createHash, randomBytes } from 'node:crypto';
-import { join } from 'node:path';
-
 import { createSigningProxy, MAX_SIGNING_BODY_BYTES } from './proxy.js';
+import { workflowStore } from './workflow-store.js';
 import {
   clearSessionCookie,
   cookieValue,
@@ -11,7 +10,6 @@ import {
   sessionCookie,
   unsealCookie,
 } from './session.js';
-import { workflowStore } from './workflow-store.js';
 
 interface RequestLike {
   method: string;
@@ -26,8 +24,7 @@ interface ResponseLike {
   status(code: number): ResponseLike;
   setHeader(name: string, value: string | string[]): void;
   json(value: unknown): void;
-  send(value: string): void;
-  sendFile(path: string): void;
+  send(value: string | Buffer): void;
   redirect(url: string): void;
 }
 interface HttpRouter {
@@ -82,10 +79,6 @@ export function installHttpRoutesFromEnvironment(RED: RedWithHttp): void {
   const cookieSecret = env.HUMAN_CHECKPOINT_COOKIE_SECRET ?? '';
   const teamId = env.HUMAN_CHECKPOINT_TEAM_ID ?? '';
   const moltNetUrl = env.HUMAN_CHECKPOINT_MOLTNET_URL ?? '';
-  const customerId =
-    env.HUMAN_CHECKPOINT_DEMO_CUSTOMER_ID ?? 'CUST-NORTH-WATER';
-  const publicDirectory = env.HUMAN_CHECKPOINT_DASHBOARD_PUBLIC_DIR ?? '';
-  const store = workflowStore();
 
   const proxy = createSigningProxy({
     moltNetUrl,
@@ -105,36 +98,11 @@ export function installHttpRoutesFromEnvironment(RED: RedWithHttp): void {
   });
 
   RED.httpNode.get('/', (_request, response) => {
-    response.redirect('/dashboard/requests/');
+    response.redirect('/dashboard/ui/requests');
   });
 
   RED.httpNode.get('/dashboard/', (_request, response) => {
-    response.redirect('/dashboard/requests/');
-  });
-
-  RED.httpNode.get('/dashboard/requests/', (_request, response) => {
-    noStore(response);
-    response.sendFile(join(publicDirectory, 'requests/index.html'));
-  });
-
-  RED.httpNode.get('/dashboard/hardware-setup/', (_request, response) => {
-    noStore(response);
-    response.sendFile(join(publicDirectory, 'hardware-setup/index.html'));
-  });
-
-  RED.httpNode.get('/dashboard/technician-briefing/', (_request, response) => {
-    noStore(response);
-    response.sendFile(join(publicDirectory, 'technician-briefing/index.html'));
-  });
-
-  RED.httpNode.get('/dashboard/app.css', (_request, response) => {
-    noStore(response);
-    response.sendFile(join(publicDirectory, 'app.css'));
-  });
-
-  RED.httpNode.get('/dashboard/app.js', (_request, response) => {
-    noStore(response);
-    response.sendFile(join(publicDirectory, 'app.js'));
+    response.redirect('/dashboard/ui/requests');
   });
 
   RED.httpNode.get('/dashboard/api/config', (_request, response) => {
@@ -142,7 +110,6 @@ export function installHttpRoutesFromEnvironment(RED: RedWithHttp): void {
     response.json({
       teamId,
       signerUrl: env.HUMAN_CHECKPOINT_SIGNER_URL ?? 'http://127.0.0.1:17373',
-      serviceRequestId: 'SR-2048',
     });
   });
 
@@ -165,137 +132,24 @@ export function installHttpRoutesFromEnvironment(RED: RedWithHttp): void {
     });
   });
 
-  RED.httpNode.get('/dashboard/auth/consent', async (request, response) => {
+  RED.httpNode.get('/dashboard/api/attachments/:id', (request, response) => {
     noStore(response);
-    try {
-      if (env.HUMAN_CHECKPOINT_LOCAL_AUTO_CONSENT !== 'true') {
-        return response.status(404).send('Not found');
-      }
-      const adminUrl = env.HUMAN_CHECKPOINT_HYDRA_ADMIN_URL ?? '';
-      if (!isLoopbackUrl(adminUrl)) {
-        throw new Error('Local consent requires a loopback Hydra admin URL');
-      }
-      const challenge = request.query.consent_challenge;
-      if (typeof challenge !== 'string' || !challenge) {
-        throw new Error('Missing consent challenge');
-      }
-      const encoded = encodeURIComponent(challenge);
-      const pendingResponse = await fetch(
-        `${adminUrl.replace(/\/+$/, '')}/admin/oauth2/auth/requests/consent?consent_challenge=${encoded}`,
-      );
-      const pending = (await pendingResponse.json()) as Record<string, unknown>;
-      if (!pendingResponse.ok) {
-        throw new Error(`Consent lookup failed (${pendingResponse.status})`);
-      }
-      const client = pending.client as Record<string, unknown> | undefined;
-      if (client?.client_id !== env.HUMAN_CHECKPOINT_HUMAN_CLIENT_ID) {
-        throw new Error('Consent request is for an unexpected client');
-      }
-      const allowedScopes = new Set(HUMAN_OIDC_SCOPE.split(' '));
-      const requestedScopes = Array.isArray(pending.requested_scope)
-        ? pending.requested_scope.filter(
-            (scope): scope is string =>
-              typeof scope === 'string' && allowedScopes.has(scope),
-          )
-        : [];
-      const acceptResponse = await fetch(
-        `${adminUrl.replace(/\/+$/, '')}/admin/oauth2/auth/requests/consent/accept?consent_challenge=${encoded}`,
-        {
-          method: 'PUT',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({
-            grant_scope: requestedScopes,
-            remember: false,
-            session: { access_token: {}, id_token: {} },
-          }),
-        },
-      );
-      const accepted = (await acceptResponse.json()) as Record<string, unknown>;
-      if (!acceptResponse.ok || typeof accepted.redirect_to !== 'string') {
-        throw new Error(`Consent acceptance failed (${acceptResponse.status})`);
-      }
-      response.redirect(accepted.redirect_to);
-    } catch (error) {
-      response
-        .status(400)
-        .send(error instanceof Error ? error.message : String(error));
+    const id = String(request.params?.id ?? '');
+    if (!isRequestAttachmentId(id)) {
+      response.status(400).send('Invalid attachment ID.');
+      return;
     }
-  });
-
-  RED.httpNode.get('/dashboard/api/requests', (request, response) => {
-    noStore(response);
-    const rawStatus = request.query.status;
-    const status =
-      rawStatus === 'open' ||
-      rawStatus === 'pending-review' ||
-      rawStatus === 'closed'
-        ? rawStatus
-        : undefined;
-    response.json({
-      requests: store.listSupportRequestsForCustomer(customerId, status),
-    });
-  });
-
-  RED.httpNode.get('/dashboard/api/requests/:id', (request, response) => {
-    noStore(response);
-    const id = request.params?.id ?? '';
-    const supportRequest = store.getSupportRequestForCustomer(id, customerId);
-    if (!supportRequest)
-      return response.status(404).json({ error: 'Support request not found' });
-    response.json({
-      request: supportRequest,
-      reusableHistory: store.listReusableHistory(supportRequest.id),
-    });
-  });
-
-  RED.httpNode.get(
-    '/dashboard/api/workflows/recoverable',
-    (_request, response) => {
-      noStore(response);
-      response.json({
-        workflows: store
-          .listRecoverableWorkflows()
-          .filter((snapshot) => snapshot.request.customerId === customerId),
-      });
-    },
-  );
-
-  RED.httpNode.get('/dashboard/api/workflows/:id', (request, response) => {
-    noStore(response);
-    try {
-      const snapshot = store.getWorkflowSnapshot(request.params?.id ?? '');
-      if (snapshot.request.customerId !== customerId) {
-        return response.status(404).json({ error: 'Workflow not found' });
-      }
-      response.json(snapshot);
-    } catch {
-      response.status(404).json({ error: 'Workflow not found' });
+    const attachment = workflowStore().getSupportRequestAttachment(id);
+    if (!attachment) {
+      response.status(404).send('Attachment not found.');
+      return;
     }
+    response.setHeader('content-type', attachment.mediaType);
+    response.setHeader('content-length', String(attachment.byteLength));
+    response.setHeader('x-content-type-options', 'nosniff');
+    response.setHeader('content-disposition', `inline; filename="${id}.webp"`);
+    response.send(Buffer.from(attachment.content));
   });
-
-  RED.httpNode.all(
-    '/dashboard/api/requests/:id/workflow',
-    (request, response) => {
-      noStore(response);
-      if (request.method !== 'POST') {
-        return response.status(405).json({ error: 'Method not allowed' });
-      }
-      const id = request.params?.id ?? '';
-      const supportRequest = store.getSupportRequestForCustomer(id, customerId);
-      if (!supportRequest) {
-        return response
-          .status(404)
-          .json({ error: 'Support request not found' });
-      }
-      if (supportRequest.status !== 'open') {
-        return response
-          .status(409)
-          .json({ error: 'Only open support requests can start work' });
-      }
-      const workflow = store.startWorkflow(id);
-      response.status(201).json(store.getWorkflowSnapshot(workflow.id));
-    },
-  );
 
   RED.httpNode.get('/dashboard/auth/login', (_request, response) => {
     const missing = requiredEnv(env, [
@@ -330,9 +184,22 @@ export function installHttpRoutesFromEnvironment(RED: RedWithHttp): void {
       state,
       code_challenge: challenge,
       code_challenge_method: 'S256',
-      prompt: 'login',
     }).toString();
     response.redirect(authorize.toString());
+  });
+
+  RED.httpNode.get('/dashboard/auth/consent', async (request, response) => {
+    noStore(response);
+    try {
+      await acceptLocalConsent(request, response, {
+        hydraAdminUrl: env.HUMAN_CHECKPOINT_HYDRA_ADMIN_URL ?? '',
+        clientId: env.HUMAN_CHECKPOINT_HUMAN_CLIENT_ID ?? '',
+      });
+    } catch (error) {
+      response
+        .status(500)
+        .send(error instanceof Error ? error.message : String(error));
+    }
   });
 
   RED.httpNode.get('/dashboard/auth/callback', async (request, response) => {
@@ -432,6 +299,71 @@ export function installHttpRoutesFromEnvironment(RED: RedWithHttp): void {
   });
 }
 
+export async function acceptLocalConsent(
+  request: Pick<RequestLike, 'query'>,
+  response: Pick<ResponseLike, 'status' | 'send' | 'redirect'>,
+  input: { hydraAdminUrl: string; clientId: string },
+): Promise<void> {
+  const challenge =
+    typeof request.query.consent_challenge === 'string'
+      ? request.query.consent_challenge
+      : '';
+  if (!challenge) {
+    response.status(400).send('Missing consent challenge.');
+    return;
+  }
+  if (!input.hydraAdminUrl || !input.clientId) {
+    response.status(503).send('Local consent is not configured.');
+    return;
+  }
+  const adminUrl = input.hydraAdminUrl.replace(/\/+$/, '');
+  const encoded = encodeURIComponent(challenge);
+  const pending = await fetch(
+    `${adminUrl}/admin/oauth2/auth/requests/consent?consent_challenge=${encoded}`,
+  );
+  if (!pending.ok)
+    throw new Error(`Consent lookup failed with HTTP ${pending.status}`);
+  const consent = (await pending.json()) as {
+    client?: { client_id?: unknown };
+    requested_scope?: unknown;
+  };
+  if (consent.client?.client_id !== input.clientId) {
+    response
+      .status(403)
+      .send('Consent is only available for the local dashboard client.');
+    return;
+  }
+  const scopes = Array.isArray(consent.requested_scope)
+    ? consent.requested_scope.filter(
+        (scope): scope is string => typeof scope === 'string',
+      )
+    : [];
+  const allowedScopes = new Set(HUMAN_OIDC_SCOPE.split(' '));
+  if (scopes.some((scope) => !allowedScopes.has(scope))) {
+    response.status(403).send('The dashboard requested an unsupported scope.');
+    return;
+  }
+  const accepted = await fetch(
+    `${adminUrl}/admin/oauth2/auth/requests/consent/accept?consent_challenge=${encoded}`,
+    {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        grant_scope: scopes,
+        remember: true,
+        remember_for: 3600,
+      }),
+    },
+  );
+  if (!accepted.ok)
+    throw new Error(`Consent acceptance failed with HTTP ${accepted.status}`);
+  const result = (await accepted.json()) as { redirect_to?: unknown };
+  if (typeof result.redirect_to !== 'string' || !result.redirect_to) {
+    throw new Error('Consent acceptance returned no redirect.');
+  }
+  response.redirect(result.redirect_to);
+}
+
 export async function readSigningRequestBody(
   request: Pick<RequestLike, 'body' | 'method'> &
     Partial<AsyncIterable<unknown>>,
@@ -491,11 +423,15 @@ function isLoopbackUrl(value: string): boolean {
 }
 
 export function humanLogoutTarget(value: string | undefined): string {
-  return value && isLoopbackUrl(value) ? value : '/dashboard/hardware-setup/';
+  return value && isLoopbackUrl(value) ? value : '/dashboard/ui/hardware-setup';
+}
+
+export function isRequestAttachmentId(value: string): boolean {
+  return /^ATT-[0-9]{3,12}$/.test(value);
 }
 
 function safeReturnTo(value: string | undefined): string {
-  if (!value) return '/dashboard/requests/';
+  if (!value) return '/dashboard/ui/requests';
   try {
     const url = new URL(value, 'http://human-checkpoint.local');
     if (
@@ -506,5 +442,5 @@ function safeReturnTo(value: string | undefined): string {
       return `${url.pathname}${url.search}${url.hash}`;
     }
   } catch {}
-  return '/dashboard/requests/';
+  return '/dashboard/ui/requests';
 }

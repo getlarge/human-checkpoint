@@ -4,14 +4,19 @@ import { createCheckpointEnvelope } from './envelope.js';
 import { assertApprovedCheckpoint, runAuthorizedResearch } from './gate.js';
 import type { SigningRequestView } from './types.js';
 
-const created = createCheckpointEnvelope('research-authorization', 'team-1', {
-  externalTool: 'exa',
-  queries: ['pump vibration OEM service bulletin'],
-  allowedDomains: ['manufacturer.example'],
-  maxResults: 3,
-  reason: 'Confirm safe inspection steps',
-  authorizationExpiresAt: '2030-01-01T00:00:00.000Z',
-});
+const created = createCheckpointEnvelope(
+  'research-authorization',
+  'SR-2048',
+  'team-1',
+  {
+    externalTool: 'exa',
+    queries: ['pump vibration OEM service bulletin'],
+    allowedDomains: ['manufacturer.example'],
+    maxResults: 3,
+    reason: 'Confirm safe inspection steps',
+    authorizationExpiresAt: '2030-01-01T00:00:00.000Z',
+  },
+);
 
 const approved: SigningRequestView = {
   id: '11111111-1111-4111-8111-111111111111',
@@ -83,6 +88,7 @@ describe('authoritative research gate', () => {
   it('blocks a changed canonical scope and an expired authorization', () => {
     const changed = createCheckpointEnvelope(
       'research-authorization',
+      'SR-2048',
       'team-1',
       {
         ...created.envelope.payload,

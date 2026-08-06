@@ -1,0 +1,474 @@
+<template>
+  <main class="setup-workspace">
+    <header>
+      <div>
+        <p class="product">Human Checkpoint</p>
+        <h1>YubiKey approval setup</h1>
+        <p>
+          Register the YubiKey used to claim assigned requests and release
+          completed work orders.
+        </p>
+      </div>
+      <a class="secondary" href="/dashboard/ui/requests"
+        >View assigned requests</a
+      >
+    </header>
+    <div v-if="error" class="notice error" role="alert">{{ error }}</div>
+    <div v-else class="notice" role="status">{{ notice }}</div>
+    <section class="setup-grid">
+      <article>
+        <p class="label">Local companion</p>
+        <h2>{{ companionReady ? 'Connected' : 'Checking connection' }}</h2>
+        <p>
+          The companion keeps browser credentials away from the loopback
+          hardware ceremony.
+        </p>
+        <button class="secondary" :disabled="busy" @click="load">
+          Check again
+        </button>
+      </article>
+      <article>
+        <p class="label">Approval key</p>
+        <h2>
+          {{ credential ? stateLabel(credential.status) : 'Not enrolled' }}
+        </h2>
+        <template v-if="credential"
+          ><dl>
+            <div>
+              <dt>Label</dt>
+              <dd>{{ credential.label }}</dd>
+            </div>
+            <div>
+              <dt>Method</dt>
+              <dd>{{ credential.verificationMethod }}</dd>
+            </div>
+            <div>
+              <dt>Credential ID</dt>
+              <dd class="mono">{{ credential.id }}</dd>
+            </div>
+          </dl></template
+        >
+        <div class="actions">
+          <button
+            v-if="!credential"
+            :disabled="busy || !companionReady"
+            @click="enroll"
+          >
+            Enroll YubiKey
+          </button>
+          <button
+            v-if="credential?.status === 'pending_approval'"
+            :disabled="busy"
+            @click="activate"
+          >
+            Activate as credential manager
+          </button>
+          <a
+            v-if="credential?.status === 'active'"
+            class="primary"
+            href="/dashboard/ui/requests"
+            >View assigned requests</a
+          >
+        </div>
+      </article>
+    </section>
+    <section class="progress">
+      <h2>Setup progress</h2>
+      <ol>
+        <li :data-complete="companionReady">Companion connected</li>
+        <li :data-complete="Boolean(credential)">YubiKey enrolled</li>
+        <li :data-complete="credential?.status === 'active'">
+          Credential activated
+        </li>
+      </ol>
+    </section>
+  </main>
+</template>
+<script>
+  class HardwareCompanion {
+    constructor(baseUrl) {
+      const url = new URL(baseUrl);
+      if (
+        url.protocol !== 'http:' ||
+        !['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname)
+      )
+        throw new Error('Signer companion must use a loopback HTTP URL');
+      this.baseUrl = url;
+      this.token = null;
+    }
+    async request(path, init, authenticated = true) {
+      const response = await fetch(new URL(path, this.baseUrl), {
+        ...init,
+        credentials: 'omit',
+        redirect: 'error',
+        headers: {
+          accept: 'application/json',
+          ...(init.body ? { 'content-type': 'application/json' } : {}),
+          ...(authenticated && this.token
+            ? { 'x-moltnet-signer-session': this.token }
+            : {}),
+        },
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok)
+        throw new Error(
+          body.message || `Signer companion returned HTTP ${response.status}`,
+        );
+      return body;
+    }
+    async connect() {
+      const session = await this.request(
+        '/v1/sessions',
+        { method: 'POST' },
+        false,
+      );
+      this.token = session.token;
+    }
+    async complete(body, popup) {
+      if (!this.token) await this.connect();
+      const ceremony = await this.request('/v1/ceremonies', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      });
+      if (!popup || popup.closed)
+        throw new Error('Allow the signer approval popup, then retry');
+      popup.location.replace(ceremony.approvalUrl);
+      popup.focus();
+      const deadline = Date.now() + 5 * 60 * 1000;
+      while (Date.now() < deadline) {
+        const result = await this.request(
+          `/v1/ceremonies/${ceremony.id}/result`,
+          { method: 'GET' },
+        );
+        if (result.status === 'completed') return result;
+        if (result.status === 'failed')
+          throw new Error(`${result.message} (${result.code})`);
+        await new Promise((resolve) => setTimeout(resolve, 500));
+      }
+      throw new Error('The signer ceremony expired. Start again.');
+    }
+  }
+  async function setupRequest(url, init = {}) {
+    const response = await fetch(url, {
+      credentials: 'same-origin',
+      ...init,
+      headers: {
+        accept: 'application/json',
+        ...(init.body ? { 'content-type': 'application/json' } : {}),
+      },
+    });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok)
+      throw new Error(
+        body.detail ||
+          body.error ||
+          `Request failed with HTTP ${response.status}`,
+      );
+    return body;
+  }
+  export default {
+    data() {
+      return {
+        config: null,
+        companion: null,
+        companionReady: false,
+        credential: null,
+        busy: false,
+        error: '',
+        notice: 'Checking the YubiKey companion and team credential…',
+      };
+    },
+    mounted() {
+      this.load();
+    },
+    methods: {
+      stateLabel(status) {
+        return status === 'active'
+          ? 'Ready to approve work'
+          : status === 'pending_approval'
+            ? 'Activation required'
+            : status.replaceAll('_', ' ');
+      },
+      async load() {
+        this.busy = true;
+        this.error = '';
+        try {
+          this.config = await setupRequest('/dashboard/api/config');
+          const companion = new HardwareCompanion(this.config.signerUrl);
+          await companion.connect();
+          this.companion = companion;
+          this.companionReady = true;
+          const list = await setupRequest(
+            '/dashboard/api/signing/crypto/signing-credentials?limit=100',
+          );
+          this.credential =
+            (list.items || []).find((item) => item.status === 'active') ||
+            (list.items || []).find(
+              (item) => item.status === 'pending_approval',
+            ) ||
+            null;
+          this.notice =
+            this.credential?.status === 'active'
+              ? 'This YubiKey is ready for request claims and work-order approvals.'
+              : this.credential
+                ? 'Registration is complete. A team credential manager must activate this key once.'
+                : 'The companion is ready. Enroll the technician YubiKey to continue.';
+        } catch (error) {
+          this.companionReady = false;
+          this.error = error instanceof Error ? error.message : String(error);
+        } finally {
+          this.busy = false;
+        }
+      },
+      async enroll() {
+        const popup = window.open(
+          'about:blank',
+          'human-checkpoint-signer',
+          'popup,width=600,height=760',
+        );
+        this.busy = true;
+        this.error = '';
+        try {
+          const enrollment = await this.companion.complete(
+            {
+              version: 1,
+              operation: 'credential-enrollment',
+              label: 'Human Checkpoint technician YubiKey',
+              teamId: this.config.teamId,
+            },
+            popup,
+          );
+          const registration = await setupRequest(
+            '/dashboard/api/signing/crypto/signing-credentials/registrations',
+            {
+              method: 'POST',
+              body: JSON.stringify({
+                verificationMethod: 'human-hardware-previewsign',
+                credentialType: 'preview-sign-arkg',
+                algorithm: 'arkg-p256-esp256',
+                label: 'Human Checkpoint technician YubiKey',
+                publicMaterial: enrollment.publicMaterial,
+              }),
+            },
+          );
+          const proof = await this.companion.complete(
+            {
+              version: 1,
+              operation: 'credential-registration',
+              resourceId: registration.id,
+              challenge: registration.challenge,
+            },
+            popup,
+          );
+          await setupRequest(
+            `/dashboard/api/signing/crypto/signing-credentials/registrations/${registration.id}/complete`,
+            {
+              method: 'POST',
+              body: JSON.stringify({
+                publicMaterial: enrollment.publicMaterial,
+                receipt: proof.receipt,
+              }),
+            },
+          );
+          await this.load();
+        } catch (error) {
+          this.error = error instanceof Error ? error.message : String(error);
+        } finally {
+          popup?.close();
+          this.busy = false;
+        }
+      },
+      async activate() {
+        this.busy = true;
+        this.error = '';
+        try {
+          await setupRequest(
+            `/dashboard/api/signing/crypto/signing-credentials/${this.credential.id}/approve`,
+            {
+              method: 'POST',
+              body: JSON.stringify({
+                reason: 'Human Checkpoint local demo activation',
+              }),
+            },
+          );
+          await this.load();
+        } catch (error) {
+          this.error =
+            error?.message === 'Credential cannot transition to active'
+              ? 'The person who enrolled this YubiKey cannot activate it. Sign in as the seeded credential manager for this one-time step.'
+              : error instanceof Error
+                ? error.message
+                : String(error);
+        } finally {
+          this.busy = false;
+        }
+      },
+    },
+  };
+</script>
+<style>
+  .setup-workspace {
+    --ink: #14211f;
+    --muted: #536763;
+    --line: #c9d5d2;
+    --teal: #087f78;
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: 30px;
+    color: var(--ink);
+    font-family: 'Avenir Next', Avenir, 'Segoe UI', sans-serif;
+  }
+  .setup-workspace > header {
+    display: flex;
+    justify-content: space-between;
+    gap: 24px;
+    align-items: flex-start;
+    padding-bottom: 24px;
+    border-bottom: 1px solid var(--line);
+  }
+  .product,
+  .label {
+    margin: 0 0 6px;
+    color: var(--teal);
+    font-weight: 750;
+  }
+  .setup-workspace h1 {
+    margin: 4px 0 8px;
+    font-size: 36px;
+    letter-spacing: -0.025em;
+  }
+  .setup-workspace header p:last-child,
+  .setup-workspace article > p:last-of-type {
+    max-width: 68ch;
+    margin: 0;
+    color: var(--muted);
+  }
+  .setup-grid {
+    display: grid;
+    grid-template-columns: 1fr 1.2fr;
+    gap: 20px;
+    margin-top: 24px;
+  }
+  .setup-workspace article,
+  .progress {
+    padding: 24px;
+    border-radius: 12px;
+    background: #fff;
+    box-shadow: 0 8px 24px rgba(20, 33, 31, 0.07);
+  }
+  .setup-workspace h2 {
+    margin: 0 0 10px;
+  }
+  .setup-workspace dl {
+    margin: 18px 0 0;
+  }
+  .setup-workspace dl div {
+    display: grid;
+    grid-template-columns: 130px 1fr;
+    gap: 12px;
+    padding: 9px 0;
+    border-top: 1px solid var(--line);
+  }
+  .setup-workspace dt {
+    color: var(--muted);
+    font-weight: 650;
+  }
+  .setup-workspace dd {
+    margin: 0;
+  }
+  .actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 18px;
+  }
+  .setup-workspace button,
+  .primary,
+  .secondary {
+    border: 0;
+    border-radius: 6px;
+    padding: 11px 16px;
+    background: var(--teal);
+    color: #fff;
+    font: inherit;
+    font-weight: 750;
+    text-decoration: none;
+    cursor: pointer;
+  }
+  .secondary {
+    border: 1px solid var(--line);
+    background: #fff;
+    color: var(--ink);
+  }
+  .setup-workspace :focus-visible {
+    outline: 3px solid #54b8b2;
+    outline-offset: 3px;
+  }
+  .notice {
+    margin-top: 18px;
+    padding: 14px 18px;
+    border-radius: 8px;
+    background: #e4f3ee;
+    color: #1f6248;
+  }
+  .notice.error {
+    background: #fdebea;
+    color: #8c2d2d;
+  }
+  .progress {
+    margin-top: 20px;
+  }
+  .progress ol {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    padding: 0;
+    list-style: none;
+    counter-reset: step;
+  }
+  .progress li {
+    counter-increment: step;
+    padding: 12px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+  }
+  .progress li:before {
+    content: counter(step) ' · ';
+    font-weight: 800;
+  }
+  .progress li[data-complete='true'] {
+    border-color: #62a88b;
+    color: #1f6248;
+  }
+  .mono {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 13px;
+    overflow-wrap: anywhere;
+  }
+  @media (max-width: 720px) {
+    .setup-workspace {
+      padding: 16px;
+    }
+    .setup-workspace > header {
+      display: block;
+    }
+    .secondary {
+      display: inline-block;
+      margin-top: 16px;
+    }
+    .setup-grid,
+    .progress ol {
+      grid-template-columns: 1fr;
+    }
+    .setup-workspace dl div {
+      grid-template-columns: 1fr;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .setup-workspace * {
+      scroll-behavior: auto !important;
+      transition: none !important;
+      animation: none !important;
+    }
+  }
+</style>

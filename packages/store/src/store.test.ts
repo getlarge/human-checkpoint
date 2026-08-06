@@ -13,22 +13,46 @@ describe('HumanCheckpointStore', () => {
 
     expect(
       store.listSupportRequests('open').map((request) => request.id),
-    ).toEqual(['SR-2048']);
-    expect(store.listSupportRequests('closed')).toHaveLength(4);
+    ).toEqual(['SR-2075', 'SR-2048']);
+    expect(store.listSupportRequests('closed')).toHaveLength(8);
     expect(
       store.listSupportRequests('pending-review').map((request) => request.id),
-    ).toEqual(['SR-1984']);
+    ).toEqual(['SR-2063', 'SR-1984', 'SR-2051']);
     expect(
       store
         .listSupportRequestsForCustomer('CUST-NORTH-WATER', 'closed')
         .map((request) => request.id),
-    ).toEqual(['SR-1671', 'SR-1538', 'SR-1172']);
+    ).toEqual(['SR-1714', 'SR-1671', 'SR-1538', 'SR-1172']);
     expect(
       store.getSupportRequestForCustomer('SR-1902', 'CUST-NORTH-WATER'),
     ).toBeNull();
     expect(
       store.listReusableHistory('SR-2048').map((request) => request.id),
     ).toEqual(['SR-1671', 'SR-1538', 'SR-1172']);
+    expect(
+      store.listReusableHistory('SR-2075').map((request) => request.id),
+    ).toEqual(['SR-2010', 'SR-1938', 'SR-1872']);
+
+    const conveyor = store.getSupportRequest('SR-2075');
+    expect(conveyor).toMatchObject({
+      customerName: 'Aster Components',
+      assetId: 'CV-204',
+      assetModel: 'Dorner 2100 Series End Drive',
+    });
+    expect(conveyor?.attachments).toHaveLength(3);
+    expect(conveyor?.attachments[0]).toMatchObject({
+      id: 'ATT-881',
+      mediaType: 'image/webp',
+      url: '/dashboard/api/attachments/ATT-881',
+    });
+    expect(conveyor?.attachments[0]?.byteLength).toBeGreaterThan(100_000);
+    expect(conveyor?.attachments[0]).not.toHaveProperty('content');
+
+    const storedPhoto = store.getSupportRequestAttachment('ATT-881');
+    expect(storedPhoto?.content.byteLength).toBe(
+      conveyor?.attachments[0]?.byteLength,
+    );
+    expect(storedPhoto?.sha256).toBe(conveyor?.attachments[0]?.sha256);
 
     store.close();
   });
@@ -103,6 +127,34 @@ describe('HumanCheckpointStore', () => {
       store.beginStep(workflow.id, 'review-request', { revision: 2 }),
     ).toThrow('different input');
 
+    store.close();
+  });
+
+  it('normalizes a completed step result without losing recovery history', () => {
+    const store = new HumanCheckpointStore(':memory:');
+    store.seedDemoData();
+    const workflow = store.startWorkflow('SR-2048');
+    const input = { requestId: 'SR-2048' };
+    store.beginStep(workflow.id, 'prepare-brief', input);
+    store.completeStep(workflow.id, 'prepare-brief', input, {
+      artifactBody: { findings: 'One grounded finding' },
+    });
+
+    const step = store.replaceCompletedStepResult(
+      workflow.id,
+      'prepare-brief',
+      { artifactBody: { findings: ['One grounded finding'] } },
+    );
+
+    expect(step.result).toEqual({
+      artifactBody: { findings: ['One grounded finding'] },
+    });
+    expect(
+      store
+        .listEvents(workflow.id)
+        .map((event) => event.eventType)
+        .at(-1),
+    ).toBe('step.result_normalized');
     store.close();
   });
 

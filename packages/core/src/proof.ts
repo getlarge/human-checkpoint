@@ -16,7 +16,6 @@ import {
   type HumanCheckpointProof,
   PROOF_VERSION,
   type ProofCheckpoint,
-  SERVICE_REQUEST_ID,
   type SigningRequestView,
 } from './types.js';
 
@@ -46,13 +45,18 @@ export function createProofBundle(input: {
   release: SigningRequestView;
   exportedAt?: Date;
 }): HumanCheckpointProof {
+  const researchEnvelope = parseCheckpointEnvelope(input.research.message);
+  const releaseEnvelope = parseCheckpointEnvelope(input.release.message);
+  if (researchEnvelope.serviceRequestId !== releaseEnvelope.serviceRequestId) {
+    throw new Error('Cannot export approvals for different service requests');
+  }
   const checkpoints: [ProofCheckpoint, ProofCheckpoint] = [
     exportCheckpoint('research-authorization', input.research, input.teamId),
     exportCheckpoint('field-release', input.release, input.teamId),
   ];
   const withoutHash = {
     format: PROOF_VERSION,
-    serviceRequestId: SERVICE_REQUEST_ID,
+    serviceRequestId: researchEnvelope.serviceRequestId,
     teamId: input.teamId,
     exportedAt: (input.exportedAt ?? new Date()).toISOString(),
     checkpoints,
@@ -74,7 +78,7 @@ export function verifyProofArtifact(value: unknown): ProofVerificationReport {
     proofHashValid = proofHash === sha256Base64Url(canonicalBytes(withoutHash));
     if (!proofHashValid) errors.push('artifact proofHash mismatch');
     checkpoints = artifact.checkpoints.map((checkpoint) =>
-      verifyCheckpoint(checkpoint, artifact.teamId),
+      verifyCheckpoint(checkpoint, artifact.teamId, artifact.serviceRequestId),
     );
     const keys = checkpoints.map((checkpoint) => checkpoint.derivedPublicKey);
     keysDiffer = Boolean(keys[0] && keys[1] && keys[0] !== keys[1]);
@@ -157,7 +161,8 @@ function parseArtifact(value: unknown): HumanCheckpointProof {
   );
   if (
     artifact.format !== PROOF_VERSION ||
-    artifact.serviceRequestId !== SERVICE_REQUEST_ID ||
+    typeof artifact.serviceRequestId !== 'string' ||
+    !/^SR-[0-9]{3,12}$/.test(artifact.serviceRequestId) ||
     typeof artifact.teamId !== 'string' ||
     !artifact.teamId ||
     typeof artifact.exportedAt !== 'string' ||
@@ -173,6 +178,7 @@ function parseArtifact(value: unknown): HumanCheckpointProof {
 function verifyCheckpoint(
   checkpoint: ProofCheckpoint,
   teamId: string,
+  serviceRequestId: string,
 ): VerificationCheck {
   const result: VerificationCheck = {
     checkpoint: String(checkpoint?.checkpoint ?? 'unknown'),
@@ -189,6 +195,8 @@ function verifyCheckpoint(
     const envelope = parseCheckpointEnvelope(checkpoint.canonicalMessage);
     if (envelope.checkpoint !== checkpoint.checkpoint)
       fail('checkpoint mismatch');
+    if (envelope.serviceRequestId !== serviceRequestId)
+      fail('service request mismatch');
     if (envelope.teamId !== teamId || checkpoint.request.teamId !== teamId)
       fail('team mismatch');
     if (checkpoint.request.status !== 'completed' || !checkpoint.request.valid)

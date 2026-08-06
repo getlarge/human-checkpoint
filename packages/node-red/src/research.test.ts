@@ -6,14 +6,19 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { invokeExaAfterAuthoritativeApproval } from './research.js';
 
-const created = createCheckpointEnvelope('research-authorization', 'team-1', {
-  externalTool: 'exa',
-  queries: ['pump vibration'],
-  allowedDomains: ['manufacturer.example'],
-  maxResults: 2,
-  reason: 'Confirm inspection sequence',
-  authorizationExpiresAt: '2030-01-01T00:00:00.000Z',
-});
+const created = createCheckpointEnvelope(
+  'research-authorization',
+  'SR-2048',
+  'team-1',
+  {
+    externalTool: 'exa',
+    queries: ['pump vibration'],
+    allowedDomains: ['manufacturer.example'],
+    maxResults: 2,
+    reason: 'Confirm inspection sequence',
+    authorizationExpiresAt: '2030-01-01T00:00:00.000Z',
+  },
+);
 const request: SigningRequestView = {
   id: '11111111-1111-4111-8111-111111111111',
   status: 'completed',

@@ -8,13 +8,14 @@
     "prestart": "pnpm --filter @human-checkpoint/node-red build",
     "start": "node --env-file-if-exists=../../.env.local node_modules/node-red/red.js --userDir . --settings settings.cjs flows/flows.json",
     "agent": "node --env-file-if-exists=../../.env.local scripts/run-agent.mjs",
-    "generate:flow": "node scripts/generate-flow.mjs",
+    "generate:flow": "node scripts/generate-flow.mjs && prettier --write flows/flows.json",
     "seed:runtime": "node --env-file-if-exists=../../.env.local scripts/seed-runtime-profile.mjs",
     "check:runtime": "node --check runtime/human-checkpoint-runtime.mjs && node --check scripts/run-agent.mjs && node --check scripts/seed-runtime-profile.mjs",
     "test": "vitest run",
     "typecheck": "node src/check-assets.mjs && tsc -b --emitDeclarationOnly"
   },
   "dependencies": {
+    "@flowfuse/node-red-dashboard": "1.27.0",
     "@human-checkpoint/core": "workspace:*",
     "@human-checkpoint/node-red": "workspace:*",
     "@themoltnet/agent-daemon": "0.36.0",
