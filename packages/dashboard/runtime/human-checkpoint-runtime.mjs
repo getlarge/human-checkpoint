@@ -157,18 +157,16 @@ function validateResults(results, allowedDomains, maxResults) {
 function approvalIdFromTask(task) {
   const contexts = Array.isArray(task.input?.context) ? task.input.context : [];
   const context = contexts.find(
-    (item) => item?.slug === 'technician-approved-source-check',
+    (item) => item?.slug === 'signed-request-claim',
   );
   if (!context || typeof context.content !== 'string') {
-    throw new Error(
-      'The task does not contain a technician-approved source check.',
-    );
+    throw new Error('The task does not contain the signed request claim.');
   }
   let value;
   try {
     value = JSON.parse(context.content);
   } catch {
-    throw new Error('The task approval context is not valid JSON.');
+    throw new Error('The signed request claim context is not valid JSON.');
   }
   if (
     !value ||
@@ -176,7 +174,7 @@ function approvalIdFromTask(task) {
     !/^[0-9a-f-]{36}$/i.test(value.signingRequestId)
   ) {
     throw new Error(
-      'The task approval context has no valid signing-request ID.',
+      'The signed request claim has no valid signing-request ID.',
     );
   }
   return value.signingRequestId;

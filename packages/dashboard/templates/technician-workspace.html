@@ -1135,7 +1135,7 @@ FORM: A clearance ledger—one continuous operational record with a fixed eviden
       },
       async verifyTampered() {
         try {
-          const changed = structuredClone(this.proof);
+          const changed = JSON.parse(JSON.stringify(this.proof));
           const release = changed?.checkpoints?.find(
             (item) => item.checkpoint === 'field-release',
           );

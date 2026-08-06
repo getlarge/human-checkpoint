@@ -28,6 +28,37 @@ describe('normalizeTaskResult', () => {
     });
   });
 
+  it('normalizes keyed brief findings and preserves the raw agent artifact', () => {
+    const rawBody = {
+      findings: {
+        historicalContext: 'Relevant approved service history.',
+        documentation: 'Grounded manufacturer guidance.',
+      },
+      questionsToCheck: ['Question one?', 'Question two?'],
+      unknowns: ['The cause remains unknown.'],
+    };
+
+    expect(
+      normalizeTaskResult('technician-brief', {
+        accepted: true,
+        artifactBody: rawBody,
+      }),
+    ).toEqual({
+      changed: true,
+      result: {
+        accepted: true,
+        artifactBodyRaw: rawBody,
+        artifactBody: {
+          ...rawBody,
+          findings: [
+            'Relevant approved service history.',
+            'Grounded manufacturer guidance.',
+          ],
+        },
+      },
+    });
+  });
+
   it('leaves request-review results unchanged', () => {
     const result = { artifactBody: { findings: 'A finding.' } };
 

@@ -94,6 +94,8 @@ describe('dashboard artifact', () => {
     expect(briefing).toContain('one character in a copy of the field');
     expect(briefing).toContain('The released work order is not modified.');
     expect(briefing).toContain('Tamper detected');
+    expect(briefing).toContain('JSON.parse(JSON.stringify(this.proof))');
+    expect(briefing).not.toContain('structuredClone(this.proof)');
     expect(briefing).toContain('verifiedReceiptCount');
     expect(briefing).toContain('verification.checkpoints');
   });
@@ -311,6 +313,18 @@ describe('dashboard artifact', () => {
       'The technician has signed the request claim.',
     );
     expect(byId('build-review-task')?.func).toContain('msg.reusableHistory');
+    expect(byId('build-brief-task')?.func).toContain(
+      "slug: 'signed-request-claim'",
+    );
+    expect(byId('build-review-task')?.func).toContain(
+      'historySummary to an object with relevant and similar arrays',
+    );
+    expect(byId('validate-request-review')?.func).toContain(
+      'Array.isArray(history.relevant)',
+    );
+    expect(byId('validate-request-review')?.func).toContain(
+      'Array.isArray(history.similar)',
+    );
   });
 
   it('exposes only the approval request id to the agent research tool', async () => {
@@ -326,6 +340,7 @@ describe('dashboard artifact', () => {
     expect(runtime).toContain(
       'const expectedRequestId = approvalIdFromTask(claimedTask.task)',
     );
+    expect(runtime).toContain("item?.slug === 'signed-request-claim'");
     expect(
       runtime.indexOf(
         'const expectedRequestId = approvalIdFromTask(claimedTask.task)',

@@ -477,7 +477,7 @@ if (!sourcePolicy) throw new Error('No preparation policy is configured for this
 msg.payload = {
   title: 'Review approved history for ' + request.id,
   tags: ['human-checkpoint', 'service-request', 'request-review'],
-  brief: 'The technician has signed the request claim. Review the active support request, the approved same-customer history, and the manual record supplied as task context. Return a FreeformOutput whose first artifact has kind "request-review" and a JSON body with grounded=true, requestId, historySummary, questionsToCheck, and unknowns. Separate relevant history from merely similar history. Do not call any public-source tool in this task. Treat past resolutions as comparison points, never as a diagnosis. Call submit_freeform_output with only summary and artifacts; omit proposedTaskType and verification. After submit_freeform_output succeeds, stop.',
+  brief: 'The technician has signed the request claim. Review the active support request, the approved same-customer history, and the manual record supplied as task context. Return a FreeformOutput whose first artifact has kind "request-review" and a JSON body with grounded=true, requestId, historySummary, questionsToCheck, and unknowns. Set historySummary to an object with relevant and similar arrays; each item should include the prior request id, summary, and confirmed resolution. Separate relevant history from merely similar history. Do not call any public-source tool in this task. Treat past resolutions as comparison points, never as a diagnosis. Call submit_freeform_output with only summary and artifacts; omit proposedTaskType and verification. After submit_freeform_output succeeds, stop.',
   contexts: [
     { slug: 'signed-request-claim', binding: 'user_inline', value: { signingRequestId: msg.signingRequestId, instruction: 'Preparation is permitted only because this request claim was authoritatively completed.' } },
     { slug: 'active-request', binding: 'user_inline', value: requestContext },
@@ -505,7 +505,10 @@ return msg;`,
 const request = msg.supportRequest;
 if (!review?.grounded || review.requestId !== request.id) throw new Error('The assistant review was not grounded in the claimed request.');
 if (review.rootCause || review.causes || review.diagnosis) throw new Error('The request review asserted a diagnosis.');
-if (typeof review.historySummary !== 'string' || !review.historySummary.trim()) throw new Error('The request review omitted its history summary.');
+const history = review.historySummary;
+const hasTextHistory = typeof history === 'string' && history.trim();
+const hasStructuredHistory = history && typeof history === 'object' && !Array.isArray(history) && Array.isArray(history.relevant) && Array.isArray(history.similar) && history.relevant.length + history.similar.length > 0;
+if (!hasTextHistory && !hasStructuredHistory) throw new Error('The request review omitted its history summary.');
 if (!Array.isArray(review.questionsToCheck) || review.questionsToCheck.length < 2 || !Array.isArray(review.unknowns) || !review.unknowns.length) throw new Error('The request review omitted field questions or unknowns.');
 return msg;`,
     380,

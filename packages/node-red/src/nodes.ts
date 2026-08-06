@@ -835,9 +835,13 @@ function arrayValue(value: unknown): unknown[] {
 
 function stringArray(value: unknown): string[] {
   if (typeof value === 'string' && value.trim()) return [value.trim()];
-  return arrayValue(value).filter(
-    (item): item is string => typeof item === 'string',
-  );
+  const values = Array.isArray(value)
+    ? value
+    : Object.values(recordValue(value) ?? {});
+  return values
+    .filter((item): item is string => typeof item === 'string')
+    .map((item) => item.trim())
+    .filter(Boolean);
 }
 
 function taskProgressMessage(
@@ -867,8 +871,9 @@ export function normalizeTaskResult(
   let changed = false;
   for (const field of ['findings', 'questionsToCheck', 'unknowns'] as const) {
     const current = normalizedBody[field];
-    if (typeof current === 'string' && current.trim()) {
-      normalizedBody[field] = [current.trim()];
+    const normalized = stringArray(current);
+    if (!Array.isArray(current) && normalized.length) {
+      normalizedBody[field] = normalized;
       changed = true;
     }
   }

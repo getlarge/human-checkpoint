@@ -195,6 +195,26 @@ Dashboard, signer companion, generated FlowFuse pages, MoltNet task branches,
 and absence of the retired journey API. It does not sign in, start a workflow,
 create a signing request, or produce evidence.
 
+Before each rehearsal or recording take, stop `pnpm run start:local` and restore
+the two seeded jobs to their initial queue state:
+
+```bash
+pnpm run demo:reset
+```
+
+The command creates a timestamped SQLite backup under
+`.moltnet/human-checkpoint-demo/backups/`, removes only the local workflow
+trees for `SR-2048` and `SR-2075`, and returns both requests to Open. It
+preserves MoltNet identities, team membership, YubiKey enrollment and
+activation, runtime profiles, request history, and reported photos. It refuses
+any other database path. To reset one job, use
+`pnpm run demo:reset -- SR-2048` or `pnpm run demo:reset -- SR-2075`.
+
+The reset removes local links to previous MoltNet tasks and signing requests; it
+does not delete authoritative MoltNet records. Restart with
+`pnpm run start:local` and use the newly created workflow for the next take.
+Do not use ad-hoc `sqlite3` updates.
+
 ## Demo procedure
 
 1. Show the authenticated queue: open pump request `SR-2048`, open conveyor

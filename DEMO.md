@@ -109,6 +109,11 @@ operator needs to be present only for the two touch pauses.
 
 ## Before recording
 
+- Stop the running local stack, run `pnpm run demo:reset`, then run
+  `pnpm run start:local` again. The reset backs up the demo SQLite database and
+  returns both seeded jobs to Open without changing identities, YubiKey
+  enrollment, team membership, or runtime profiles. Do not use ad-hoc
+  `sqlite3` updates.
 - Dashboard, agent daemon, signer companion, MoltNet, and Ory are healthy.
 - The field technician is signed in and the YubiKey reports ready.
 - `SR-2048` is open with no pending approval.

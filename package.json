@@ -12,6 +12,7 @@
     "bootstrap:local": "node --env-file-if-exists=.env.local scripts/bootstrap-local.mjs",
     "check": "pnpm run format:check && pnpm run typecheck && pnpm run test",
     "dashboard": "pnpm --filter @human-checkpoint/dashboard start",
+    "demo:reset": "node --env-file-if-exists=.env.local scripts/reset-demo.mjs",
     "agent": "pnpm --filter @human-checkpoint/dashboard agent",
     "infra:down": "docker compose --project-name human-checkpoint --env-file infra/.env -f infra/compose.yaml down",
     "infra:logs": "docker compose --project-name human-checkpoint --env-file infra/.env -f infra/compose.yaml logs -f",
