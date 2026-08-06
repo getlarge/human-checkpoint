@@ -1,0 +1,51 @@
+name: Deploy project site
+
+# The legacy branch-based Pages builder stalled on this repository, so the site
+# is published through the Actions pipeline instead. docs/ is already a
+# complete static site — nothing is generated here, it is uploaded verbatim.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/**'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Let a running deploy finish rather than cancelling it half-published.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Check the evidence the site publishes
+        run: |
+          test -f docs/index.html
+          test -f docs/evidence/human-checkpoint-proof.json
+          # The gate console imports these; a missing vendor build would leave
+          # the interactive sections dead while the page still rendered.
+          test -f docs/vendor/core/gate.js
+          test -f docs/vendor/human-checkpoint-proof.json
+          test -f docs/.nojekyll
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: docs
+
+      - id: deployment
+        uses: actions/deploy-pages@v4
