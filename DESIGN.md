@@ -90,10 +90,11 @@ Human-readable summaries lead; crypto details remain available in native
 
 ## Layout
 
-Desktop uses a compact service header, left journey rail, main work-order
-column, and narrower evidence column. Below 900px the evidence follows the work
-order. Below 520px actions stack and labelled records replace dense tables.
-There is no page-level horizontal scrolling at 200% zoom.
+Desktop uses a compact service header followed by full-width work-order cards:
+request facts, live agent tasks, technician claim, AI brief, final approval,
+and portable evidence. Below 760px cards become single-column, actions wrap,
+and labelled records replace dense rows. There is no page-level horizontal
+scrolling at 200% zoom.
 
 ## Elevation & Depth
 
@@ -112,10 +113,12 @@ and ruled like an inspection form.
 - **Service header:** product, assigned request, companion state, and
   technician.
 - **Request queue:** open, pending-review, and closed synthetic records.
-- **Journey rail:** assigned request, public-source check, and work-order
-  approval.
-- **Assistant work:** plain-language task purpose, durable MoltNet task ID, and
-  current status.
+- **Technician workspace:** assigned request, request claim, agent brief,
+  work-order approval, and portable evidence in operational order. The
+  read-only Node-RED flow is a separate troubleshooting link, never a numbered
+  technician step.
+- **MoltNet agent activity:** plain-language task purpose, durable task ID,
+  attempt number, and live queued, claimed, running, or completed status.
 - **Technician decision:** consequence, sources, reason, expiry, and recovery.
 - **Evidence disclosure:** exact message, digest, method, request, claimant,
   credential, and derived key with announced copy actions.

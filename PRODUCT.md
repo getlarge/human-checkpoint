@@ -16,14 +16,15 @@ judge who needs to see one physical YubiKey approve two distinct decisions.
 
 ## Product Purpose
 
-Human Checkpoint demonstrates a field-service workflow in which an AI agent may
-review an assigned request, use approved service history, and prepare a work
-order. It cannot contact public sources or release that work order until a
-technician reviews the proposed action and touches the same enrolled YubiKey
-5.8.
+Human Checkpoint demonstrates a field-service workflow in which a technician
+first claims an assigned request with a YubiKey. Only then may AI tasks review
+approved service history, check bounded public sources, and prepare a work
+order. A second YubiKey decision is required before that work order is
+released.
 
-Success is one coherent `SR-2048` demonstration: the technician sees real
-MoltNet assistant tasks; the source check is denied before hardware approval;
+Success is one coherent request demonstration: the technician sees real
+MoltNet agent tasks; no history review, brief preparation, or public-source
+lookup starts until the technician claims the request with hardware approval;
 the brief and field note cannot be released without a second approval; the two
 request-scoped public keys differ; and an offline proof fails after a
 one-character field-note mutation.
@@ -41,19 +42,26 @@ Tagline: **The agent can ask. Only a human can answer.**
 
 - One enrolled YubiKey, one field technician who owns and uses it, and one
   seeded credential manager for the one-time activation approval.
-- An authenticated queue at `/dashboard/requests`, YubiKey setup, and an
+- An authenticated queue at `/dashboard/ui/requests`, YubiKey setup, and an
   assigned-request workspace.
+- FlowFuse Dashboard pages are nodes on the same Node-RED canvas as the durable
+  agent-task and approval branches; no parallel static application exists.
 - A loopback signer companion for explicit confirmation and hardware touch.
 - MoltNet for identities, agent tasks, runtime profiles, credentials, signing
   requests, and authoritative security state; Node-RED for orchestration and a
   server-side SQLite workflow journal.
-- A synthetic industrial-pump service request, `SR-2048`.
+- Two open synthetic requests: pump vibration (`SR-2048`) and conveyor belt
+  tracking (`SR-2075`), with realistic pending-review and closed history.
+- Three reported conveyor photos stored as SQLite BLOBs and served through an
+  authenticated, no-store route. They help the technician understand the job;
+  their pixels are never provided to or analyzed by the agent.
 
 ## Capabilities and Constraints
 
-- The public-source decision binds the exact queries, domains, result limit,
-  reason, team, and expiry. The work-order decision binds the immutable brief,
-  append-only field note, fixed disposition, team, role, and shift.
+- The request claim binds the request, exact bounded public query, domains,
+  result limit, preparation permission, team, and expiry. The work-order
+  decision binds the immutable brief, append-only field note, fixed
+  disposition, team, role, and shift.
 - OAuth material remains in HttpOnly cookies or Node-RED credentials. Browser
   calls to the companion use `credentials: omit`.
 - Canonical JSON sorts keys by UTF-8 bytes and rejects ambiguous values,
@@ -91,8 +99,9 @@ available and none may be invented.
 
 1. **Human consequence first.** Explain what changes before showing the hash.
 2. **Approval binds bytes.** Re-fetch and re-canonicalize authoritative state.
-3. **Blocked means blocked.** No hardware-approved source check means no Exa;
-   no hardware-approved work order means no release.
+3. **Blocked means blocked.** No hardware-signed request claim means no history
+   review, no Exa, and no prepared brief; no hardware-approved work order means
+   no release.
 4. **Recovery is explicit.** Cancellation and expiry never silently bypass.
 5. **Evidence travels.** Verification needs no server, companion, or hardware.
 

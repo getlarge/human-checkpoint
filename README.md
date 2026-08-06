@@ -5,11 +5,12 @@
 > The agent can ask. Only a human can answer.
 
 Human Checkpoint is a working field-service demonstration. A technician opens
-an assigned support request; a MoltNet agent reviews the request and approved
-past service records; and Node-RED keeps the work moving across restarts. The
-assistant must stop twice:
+an assigned support request; claims it with a YubiKey; then watches MoltNet
+agents review approved past service records and prepare a brief. Node-RED keeps
+the work moving across restarts. The workflow stops for the technician twice:
 
-1. Before it contacts the approved public sources proposed for this job.
+1. When the technician claims the assigned request, before the agent may use
+   the public equipment sources shown with that assignment.
 2. Before the completed work order, including the technician's field note, is
    released and the support request is closed.
 
@@ -20,34 +21,40 @@ one-character change.
 
 ## What the technician sees
 
-- A signed-in queue of open, pending-review, and closed service requests.
-- The active request, its asset, and approved same-customer service history.
-- Real MoltNet task IDs and current assistant-task status.
-- A plain-language summary of the proposed public-source check before touch.
+- A signed-in queue with two open jobs: pump vibration (`SR-2048`) and
+  conveyor belt tracking (`SR-2075`), plus pending-review and closed history.
+- Reported conveyor photos that the technician can inspect as request evidence.
+  The agent does not analyze their pixels or turn them into findings.
+- The active request and asset before any agent preparation starts.
+- Real MoltNet task IDs, attempt numbers, and current agent-task status.
+- A plain-language assignment summary and the exact agent action unlocked by
+  claiming it.
 - A generated pre-visit brief that distinguishes prior outcomes from the
   current machine's still-unknown condition.
 - A required append-only field note before final approval.
 - A downloadable approval record, offline verification, and a safe tamper
   demonstration.
 
-The operator never needs the Node-RED editor or MoltNet Console.
+The technician never needs MoltNet Console or the Node-RED editor to complete
+the work. A signed-in team member can inspect the read-only Node-RED flow at
+`/dashboard/node-red/` when explaining or troubleshooting the orchestration.
 
 ## Architecture
 
 ```text
 Authenticated technician browser
-  /dashboard/requests/ -> assigned support request
+  /dashboard/ui/requests -> assigned support request
              |
              v
 Node-RED orchestration + SQLite durable store
   stable workflow id, step checkpoints, append-only events
   MoltNet task links, signing-request links, recovery after restart
              |
+             +--> technician claims the assigned request
+             |       |  loopback signer -> same YubiKey
+             |       v
              +--> MoltNet task: review request + approved history
              |       |
-             |       v
-             |    technician approves exact public-source check
-             |       |  loopback signer -> same YubiKey
              |       v
              +--> MoltNet task: prepare technician brief
              |       |
@@ -63,8 +70,17 @@ Node-RED orchestration + SQLite durable store
 Node-RED is the process orchestrator. SQLite at
 `.moltnet/human-checkpoint-demo/human-checkpoint.sqlite` stores support
 requests, workflow instances, idempotent step results, task attempts, approval
-links, and an append-only event journal. It provides Absurd-like durability
-without adding Absurd to this standalone demo.
+links, reported-photo BLOBs, and an append-only event journal. Photo bytes are
+served only through the authenticated `/dashboard/api/attachments/:id` route
+with `Cache-Control: no-store`. They are kept out of the MoltNet task context.
+SQLite provides workflow durability to this standalone demo.
+
+The application UI is also part of the Node-RED flow. Three FlowFuse Dashboard
+pages (`ui-page` + `ui-template`) emit messages directly into the request,
+agent-task, approval, release, and proof branches visible on the canvas. There
+is no separate static frontend and no parallel HTTP journey API. HTTP remains
+only where the browser needs a security boundary: OIDC, safe configuration,
+and the allowlisted MoltNet signing proxy.
 
 MoltNet remains authoritative for task attempts and signing requests. On a
 refresh or restart, the dashboard reconstructs its view from SQLite, re-fetches
@@ -90,7 +106,9 @@ used directly by the Node-RED package; nothing is published during the demo.
 
 - Every application page and API, including `http://localhost:1880/`, is behind
   the Human Checkpoint OIDC/team-membership middleware. The Node-RED editor is
-  disabled. Missing auth configuration fails closed with HTTP 503.
+  available to signed-in team members as a read-only orchestration view;
+  deployment and module installation are disabled. Missing auth configuration
+  fails closed with HTTP 503.
 - Human OAuth tokens stay AES-GCM sealed in an HttpOnly, SameSite cookie.
   Browser JavaScript receives no bearer or refresh token.
 - The signing proxy has an exact method/path allowlist, injects team and bearer
@@ -165,30 +183,29 @@ enforce-mode runtime profile; and seeds the support-request queue.
 4. Open `http://localhost:1880/`. Sign in as the field technician and enroll
    the YubiKey from “YubiKey setup”. Sign out and sign in once as the seeded
    credential manager to activate it. Return to the field technician account
-   before opening `SR-2048`. MoltNet deliberately prevents the credential
-   owner from self-approving this activation.
+   before opening a request. MoltNet deliberately prevents the credential owner
+   from self-approving this activation.
 
 `pnpm run infra:down` stops the local containers without removing their
 volumes. `pnpm run setup:local` is idempotent and reuses the generated
 identities and runtime profile.
 
-For a non-hardware smoke test, `pnpm run rehearse:before-touch` performs a
-local-only OIDC login through the loopback Hydra admin API, starts `SR-2048`,
-waits for the real request-review task, validates its artifact, creates the
-exact signing request, and stops before touching or claiming the YubiKey. It is
-a development rehearsal only and never produces or substitutes hardware
-evidence.
+For a non-hardware preflight, `pnpm run rehearse:before-touch` checks the live
+Dashboard, signer companion, generated FlowFuse pages, MoltNet task branches,
+and absence of the retired journey API. It does not sign in, start a workflow,
+create a signing request, or produce evidence.
 
 ## Demo procedure
 
-1. Show the authenticated queue, including open `SR-2048`, one request pending
-   review, and closed past requests.
-2. Open `SR-2048`. “Prepare source check for review” creates a real MoltNet
-   request-review task; its ID appears under Assistant work.
-3. Review the generated public-equipment queries, approved domains, reason, and
-   five-minute expiry. Touch the enrolled YubiKey to approve this exact check.
-4. The second MoltNet task starts. Its runtime tool re-fetches the approval,
-   performs the signed Exa scope, and produces the technician brief.
+1. Show the authenticated queue: open pump request `SR-2048`, open conveyor
+   request `SR-2075`, and pending-review and closed history. The conveyor card
+   includes reported photos; open it briefly to show all three if time allows.
+2. Open `SR-2048`. Review the assignment, planned equipment lookup, allowed
+   sites, and expiry. No history review or brief preparation has started yet.
+3. Choose “Claim request with YubiKey” and touch the enrolled key.
+4. Only after MoltNet records the claim do the request-review and brief tasks
+   start. Their IDs, attempts, and live states appear under MoltNet agent
+   activity. The runtime re-fetches the signed claim before the scoped Exa call.
 5. Add the required field note, review the final work order, and touch the same
    YubiKey to approve release.
 6. Release the order. `SR-2048` moves to the closed queue and the durable
@@ -223,6 +240,9 @@ YubiKey ceremony with mocked evidence in a submitted demo.
   physical YubiKey.
 - SQLite is appropriate for this single-server demonstration. Multi-instance
   production orchestration would need coordinated storage and leasing.
+- The technical receipt is grouped as a team-manager review surface, but this
+  demo does not yet receive a manager role claim in the dashboard session, so
+  that disclosure is not a role-based authorization boundary.
 - MoltNet, the model provider, Exa, and the signer ceremony require their
   respective services. Only final proof verification is offline.
 - A valid signature proves the exact approval ceremony; it does not certify the
