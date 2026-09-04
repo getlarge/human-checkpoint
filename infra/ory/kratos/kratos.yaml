@@ -7,7 +7,8 @@ serve:
     base_url: http://localhost:4433/
     cors:
       enabled: true
-      allowed_origins: [http://localhost:1880, http://localhost:4455]
+      allowed_origins:
+        [http://localhost:1880, http://localhost:4455, http://localhost:5174]
       allowed_methods: [POST, GET, PUT, PATCH, DELETE, OPTIONS]
       allowed_headers: [Authorization, Content-Type, X-Requested-With]
       exposed_headers: [Content-Type]
@@ -25,8 +26,9 @@ identity:
       url: file:///etc/config/kratos/human-identity-schema.json
 
 selfservice:
-  default_browser_return_url: http://localhost:1880/
-  allowed_return_urls: [http://localhost:1880/, http://localhost:4455/]
+  default_browser_return_url: http://localhost:5174/
+  allowed_return_urls:
+    [http://localhost:1880/, http://localhost:4455/, http://localhost:5174/]
   methods:
     password:
       enabled: true
@@ -95,7 +97,7 @@ selfservice:
       ui_url: http://localhost:4455/error
     logout:
       after:
-        default_browser_return_url: http://localhost:1880/
+        default_browser_return_url: http://localhost:5174/
 
 session:
   lifespan: 720h

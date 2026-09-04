@@ -46,7 +46,8 @@ const publicSourceTool = definePiTool({
             'The claimed task belongs to a different service team.',
           );
         }
-        const apiKey = requiredEnv('HUMAN_CHECKPOINT_EXA_API_KEY');
+        // Trusted host-only credential. Never add it to profile requiredEnv.
+        const apiKey = requiredEnv('EXA_API_KEY');
         const request =
           await agent.crypto.signingRequests.get(signingRequestId);
         const results = await runAuthorizedResearch({
