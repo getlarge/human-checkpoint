@@ -20,7 +20,7 @@ for (const required of [
   'HUMAN_CHECKPOINT_COOKIE_SECRET',
   'GIT_CONFIG_GLOBAL',
   'OLLAMA_API_KEY',
-  'HUMAN_CHECKPOINT_EXA_API_KEY',
+  'EXA_API_KEY',
 ]) {
   if (!localEnv[required] && !process.env[required]) {
     throw new Error(`${required} is required. Run setup again with it set.`);
@@ -30,6 +30,7 @@ for (const required of [
 const children = [
   start('dashboard', ['run', 'dashboard']),
   start('agent', ['run', 'agent']),
+  start('console-agent', ['run', 'console-agent']),
   start('signer', ['run', 'signer']),
 ];
 let stopping = false;

@@ -44,7 +44,9 @@ const profileSpec = {
   runtimeKind: 'human_checkpoint_pi',
   provider,
   model,
-  requiredEnv: [providerKey, 'HUMAN_CHECKPOINT_EXA_API_KEY'],
+  // EXA_API_KEY is resolved by trusted host runtime code. It must never be a
+  // profile requirement because profile requirements are guest-visible.
+  requiredEnv: [providerKey],
   requiredTools: ['approved_public_source_check'],
   toolEnforcement: 'enforce',
   leaseTtlSec: 900,

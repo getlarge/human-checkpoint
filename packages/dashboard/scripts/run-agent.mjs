@@ -4,20 +4,13 @@ import { fileURLToPath } from 'node:url';
 const agentName = required('MOLTNET_AGENT_NAME');
 const teamId = required('HUMAN_CHECKPOINT_TEAM_ID');
 const profileId = required('HUMAN_CHECKPOINT_RUNTIME_PROFILE_ID');
-const cli = fileURLToPath(
-  new URL(
-    '../node_modules/@themoltnet/agent-daemon/dist/main.js',
-    import.meta.url,
-  ),
-);
 const runtime = fileURLToPath(
   new URL('../runtime/human-checkpoint-runtime.mjs', import.meta.url),
 );
 const repositoryRoot = fileURLToPath(new URL('../../..', import.meta.url));
 const child = spawn(
-  process.execPath,
+  'moltnet-agent',
   [
-    cli,
     '--runtime',
     runtime,
     'poll',
@@ -32,7 +25,7 @@ const child = spawn(
     '--task-types',
     'freeform',
   ],
-  { stdio: 'inherit', env: process.env },
+  { cwd: repositoryRoot, stdio: 'inherit', env: process.env },
 );
 child.on('exit', (code, signal) => {
   if (signal) process.kill(process.pid, signal);

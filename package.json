@@ -11,6 +11,7 @@
     "build": "pnpm -r build",
     "bootstrap:local": "node --env-file-if-exists=.env.local scripts/bootstrap-local.mjs",
     "check": "pnpm run format:check && pnpm run typecheck && pnpm run test",
+    "console-agent": "node --env-file-if-exists=.env.local packages/dashboard/scripts/run-console-agent.mjs",
     "dashboard": "pnpm --filter @human-checkpoint/dashboard start",
     "demo:reset": "node --env-file-if-exists=.env.local scripts/reset-demo.mjs",
     "agent": "pnpm --filter @human-checkpoint/dashboard agent",
@@ -20,7 +21,7 @@
     "rehearse:before-touch": "node scripts/rehearse-before-touch.mjs",
     "seed:runtime": "pnpm --filter @human-checkpoint/dashboard seed:runtime",
     "setup:local": "node scripts/setup-local.mjs",
-    "signer": "node --env-file-if-exists=.env.local node_modules/@themoltnet/signer/dist/main.js",
+    "signer": "pnpm exec moltnet-signer",
     "prestart:local": "pnpm --filter @human-checkpoint/node-red build",
     "start:local": "node scripts/start-local.mjs",
     "format": "prettier --write .",
@@ -32,7 +33,7 @@
     "site:serve": "node scripts/serve-site.mjs"
   },
   "devDependencies": {
-    "@themoltnet/signer": "0.2.0",
+    "@themoltnet/signer": "0.2.6",
     "@types/node": "22.19.0",
     "prettier": "3.8.3",
     "typescript": "5.9.2",

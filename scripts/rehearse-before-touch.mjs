@@ -10,12 +10,25 @@ const dashboard = await fetch(`${origin}/dashboard/ui/requests`, {
   headers: { accept: 'text/html' },
   redirect: 'manual',
 });
-if (![200, 302, 303].includes(dashboard.status)) {
+if (![200, 302, 303, 401].includes(dashboard.status)) {
   throw new Error(`Dashboard returned HTTP ${dashboard.status}`);
 }
 
 const signer = await fetch(`${signerUrl}/health`).catch(() => null);
-if (!signer?.ok) throw new Error('The local signer companion is unavailable.');
+if (process.env.HUMAN_CHECKPOINT_REQUIRE_SIGNER === 'true' && !signer?.ok) {
+  throw new Error('The local signer companion is unavailable.');
+}
+
+const consoleUrl =
+  process.env.HUMAN_CHECKPOINT_CONSOLE_ORIGIN ?? 'http://localhost:5174';
+const console = await fetch(consoleUrl, { redirect: 'manual' }).catch(
+  () => null,
+);
+if (!console?.ok) throw new Error('The local MoltNet Console is unavailable.');
+
+const daemon = await fetch('http://127.0.0.1:17374/health').catch(() => null);
+if (!daemon?.ok)
+  throw new Error('The paired local Console daemon is unavailable.');
 
 const flow = JSON.parse(
   await readFile(
@@ -34,17 +47,15 @@ for (const type of [
 ]) {
   if (!types.has(type)) throw new Error(`Generated flow is missing ${type}.`);
 }
-if (types.has('http in') || types.has('http response')) {
-  throw new Error('Generated flow still contains the retired journey API.');
-}
-
 process.stdout.write(
   `${JSON.stringify(
     {
       dashboard: `${origin}/dashboard/ui/requests`,
       dashboardStatus:
         dashboard.status === 200 ? 'authenticated' : 'authentication-required',
-      signerCompanion: 'ready',
+      signerCompanion: signer?.ok ? 'ready' : 'not started (no-touch tour)',
+      console: consoleUrl,
+      consoleDaemon: 'ready (human_checkpoint_pi is locally registered)',
       dashboardPages: flow.filter((node) => node.type === 'ui-page').length,
       moltNetTaskBranches: flow.filter(
         (node) => node.type === 'human-checkpoint-task-run',

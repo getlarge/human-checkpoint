@@ -61,8 +61,6 @@ services:
       DSN: postgres://kratos:kratos_secret@kratos-postgres:5432/kratosdb?sslmode=disable
       SERVE_PUBLIC_BASE_URL: http://localhost:${MOLTNET_KRATOS_PUBLIC_PORT:-4433}/
       SELFSERVICE_DEFAULT_BROWSER_RETURN_URL: http://localhost:${HUMAN_CHECKPOINT_NODE_RED_PORT:-1880}/
-      SELFSERVICE_ALLOWED_RETURN_URLS: http://localhost:${HUMAN_CHECKPOINT_NODE_RED_PORT:-1880}/
-      SERVE_PUBLIC_CORS_ALLOWED_ORIGINS: http://localhost:${HUMAN_CHECKPOINT_NODE_RED_PORT:-1880}
     volumes:
       - ./ory/kratos/kratos.yaml:/etc/config/kratos/kratos.yaml:ro
       - ./ory/identity-schema.json:/etc/config/kratos/identity-schema.json:ro
@@ -247,7 +245,7 @@ services:
       ORY_KETO_ADMIN_URL: http://keto:4467
       ORY_ACTION_API_KEY: local-dev-webhook-key
       RECOVERY_CHALLENGE_SECRET: local-recovery-secret-for-hmac-signing
-      CORS_ORIGINS: http://localhost:${HUMAN_CHECKPOINT_NODE_RED_PORT:-1880}
+      CORS_ORIGINS: http://localhost:${HUMAN_CHECKPOINT_NODE_RED_PORT:-1880},http://localhost:${HUMAN_CHECKPOINT_CONSOLE_PORT:-5174}
       REDIS_HOST: redis
       REDIS_PORT: '6379'
       RUNTIME_SESSION_STORAGE_ENDPOINT: http://runtime-object-store:8333
@@ -291,6 +289,22 @@ services:
       timeout: 3s
       retries: 20
       start_period: 30s
+
+  console:
+    image: ${MOLTNET_CONSOLE_IMAGE}
+    platform: linux/amd64
+    ports:
+      - '${HUMAN_CHECKPOINT_CONSOLE_PORT:-5174}:80'
+    environment:
+      KRATOS_PUBLIC_URL: http://localhost:${MOLTNET_KRATOS_PUBLIC_PORT:-4433}
+      API_BASE_URL: http://localhost:${MOLTNET_API_PORT:-8080}
+      CONSOLE_BASE_URL: http://localhost:${HUMAN_CHECKPOINT_CONSOLE_PORT:-5174}
+      SIGNER_BASE_URL: http://127.0.0.1:17373
+      MOLTNET_AGENT_SERVER_URL: http://127.0.0.1:17374
+      PACK_GC_COMPILE_TTL_DAYS: '7'
+    depends_on:
+      rest-api:
+        condition: service_healthy
 
 volumes:
   app-db-data:

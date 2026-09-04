@@ -52,6 +52,8 @@ if (existsSync(identityPath) && existsSync(dashboardPath)) {
     );
   }
   dashboard = await ensureCredentialManager(dashboard, humanSchema.id);
+  await ensureHumanIdentityLink(dashboard.technician.id);
+  await ensureHumanIdentityLink(dashboard.credentialManager.id);
   writeApplicationEnv({ identity, dashboard });
   printSummary(identity, dashboard, true);
   process.exit(0);
@@ -118,6 +120,8 @@ runSql(`INSERT INTO humans (identity_id) VALUES (${sql(technician.id)});`);
 runSql(
   `INSERT INTO humans (identity_id) VALUES (${sql(credentialManager.id)});`,
 );
+await ensureHumanIdentityLink(technician.id);
+await ensureHumanIdentityLink(credentialManager.id);
 runSql(
   `INSERT INTO teams (id, name, status, personal, creator_agent_id) VALUES (${sql(teamId)}, 'Human Checkpoint Field Service', 'active', false, ${sql(identity.id)});`,
 );
@@ -189,7 +193,7 @@ const agentClient = await requestJson(`${hydraAdminUrl}/admin/clients`, {
     response_types: [],
     token_endpoint_auth_method: 'client_secret_post',
     scope:
-      'diary:read diary:write crypto:sign agent:profile team:read task:read task:write',
+      'agent:profile connector:invoke crypto:sign diary:manage diary:read diary:write key:manage pack:read pack:write runtime:manage runtime:read task:claim task:execute task:manage task:read team:manage team:read',
     metadata: {
       type: 'moltnet_agent',
       identity_id: identity.id,
@@ -410,11 +414,8 @@ function writeApplicationEnv({ identity, dashboard }) {
     MOLTNET_SIGNER_PORT: '17373',
     MOLTNET_SIGNER_ALLOWED_ORIGINS: dashboardOrigin,
   };
-  const inheritedOllama = process.env.OLLAMA_API_KEY;
-  const inheritedExa =
-    process.env.HUMAN_CHECKPOINT_EXA_API_KEY || process.env.EXA_API_KEY;
-  if (inheritedOllama) values.OLLAMA_API_KEY = inheritedOllama;
-  if (inheritedExa) values.HUMAN_CHECKPOINT_EXA_API_KEY = inheritedExa;
+  // Provider and public-source credentials are intentionally inherited from
+  // the operator environment. Do not copy them into VM-visible .env.local.
   writeEnv(values);
 }
 
@@ -546,6 +547,7 @@ async function ensureCredentialManager(dashboard, humanSchemaId) {
     }),
   });
   runSql(`INSERT INTO humans (identity_id) VALUES (${sql(manager.id)});`);
+  await ensureHumanIdentityLink(manager.id);
   await putRelation({
     namespace: 'Human',
     object: manager.id,
@@ -575,6 +577,68 @@ async function ensureCredentialManager(dashboard, humanSchemaId) {
     mode: 0o600,
   });
   return nextDashboard;
+}
+
+async function ensureHumanIdentityLink(identityId) {
+  const humanId = humanIdForIdentity(identityId);
+  const identity = await requestJson(
+    `${kratosAdminUrl}/admin/identities/${encodeURIComponent(identityId)}`,
+  );
+  const hasMetadata =
+    identity.metadata_public && typeof identity.metadata_public === 'object';
+  const metadata = hasMetadata ? identity.metadata_public : {};
+  if (metadata.human_id === humanId) return;
+  await requestJson(
+    `${kratosAdminUrl}/admin/identities/${encodeURIComponent(identityId)}`,
+    {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json-patch+json' },
+      body: JSON.stringify([
+        {
+          op: hasMetadata ? (metadata.human_id ? 'replace' : 'add') : 'add',
+          path: hasMetadata ? '/metadata_public/human_id' : '/metadata_public',
+          value: hasMetadata ? humanId : { human_id: humanId },
+        },
+      ]),
+    },
+  );
+}
+
+function humanIdForIdentity(identityId) {
+  const result = spawnSync(
+    'docker',
+    [
+      'compose',
+      '--project-name',
+      'human-checkpoint',
+      '--env-file',
+      join(repositoryRoot, 'infra', '.env'),
+      '-f',
+      join(repositoryRoot, 'infra', 'compose.yaml'),
+      'exec',
+      '-T',
+      'app-db',
+      'psql',
+      '-X',
+      '-q',
+      '-t',
+      '-A',
+      '-v',
+      'ON_ERROR_STOP=1',
+      '-U',
+      'moltnet',
+      '-d',
+      'moltnet',
+      '-c',
+      `SELECT id FROM humans WHERE identity_id = ${sql(identityId)};`,
+    ],
+    { cwd: repositoryRoot, encoding: 'utf8' },
+  );
+  const humanId = result.stdout.trim();
+  if (result.error || result.status !== 0 || !humanId) {
+    throw new Error('The local human record is missing.');
+  }
+  return humanId;
 }
 
 function printSummary(identity, dashboard, reused) {

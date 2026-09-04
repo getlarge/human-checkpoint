@@ -67,7 +67,9 @@ Node-RED orchestration + SQLite durable store
                   request closes + offline approval record
 ```
 
-Node-RED is the process orchestrator. SQLite at
+Node-RED is the visible workflow adapter. The reusable pattern is a durable
+workflow state machine backed by a database; it can be implemented with n8n,
+SAP Build Process Automation, or custom workflow code. SQLite at
 `.moltnet/human-checkpoint-demo/human-checkpoint.sqlite` stores support
 requests, workflow instances, idempotent step results, task attempts, approval
 links, reported-photo BLOBs, and an append-only event journal. Photo bytes are
@@ -106,7 +108,7 @@ silently creating a duplicate.
   recovery, signing requests, final release, proof handling, auth routes, and
   the same-origin signing proxy.
 - `@human-checkpoint/dashboard` — authenticated request queue, technician UI,
-  Node-RED flow, custom MoltNet agent runtime, and profile seeding scripts.
+  read-only Node-RED flow, custom MoltNet agent runtime, and profile seeding scripts.
 
 All packages are private workspace packages. The core and store packages are
 used directly by the Node-RED package; nothing is published during the demo.
@@ -149,12 +151,12 @@ fully unlinkable signing.
   are AMD64; Ory, Postgres, Redis, and the object store run natively where
   available.
 - Ollama Cloud and Exa API credentials for the two real agent tasks.
-- `@themoltnet/signer` 0.2.0 and one compatible YubiKey 5.8 advertising the
+- `@themoltnet/signer` 0.2.6 and one compatible YubiKey 5.8 advertising the
   previewSign extension.
 
-Pinned application dependencies include Node-RED 5.0.1,
-`@themoltnet/sdk` 0.128.0, `@themoltnet/agent-daemon` 0.36.0,
-`@themoltnet/pi-runtime` 0.6.0, TypeScript 5.9.2, and Vitest 3.2.4.
+Pinned application dependencies include Node-RED 5.0.6, FlowFuse Dashboard
+1.31.0, `@themoltnet/sdk` 0.140.0, `@themoltnet/agent-daemon` 0.51.0,
+`@themoltnet/pi-runtime` 0.14.1, and `@themoltnet/yubikey-preview-sign` 0.4.1.
 
 ## Local setup
 
@@ -183,13 +185,18 @@ enforce-mode runtime profile; and seeds the support-request queue.
    manager usernames and passwords are stored with mode `0600` in
    `dashboard.json` there.
 
-3. Start the dashboard, real task worker, and signer companion together:
+3. Start Console, the paired loopback daemon, dashboard, real task worker, and
+   signer companion together:
 
    ```bash
    pnpm run start:local
    ```
 
-4. Open `http://localhost:1880/`. Sign in as the field technician and enroll
+4. Open Console at `http://localhost:5174/` to inspect the Human Checkpoint
+   team, profile, enforcing policy, and sandbox. The paired daemon accepts
+   only that Console origin on `127.0.0.1:17374`; its local runtime registry
+   displays the hash for `human_checkpoint_pi`. Then open `http://localhost:1880/`.
+   Sign in as the field technician and enroll
    the YubiKey from “YubiKey setup”. Sign out and sign in once as the seeded
    credential manager to activate it. Return to the field technician account
    before opening a request. MoltNet deliberately prevents the credential owner
@@ -277,6 +284,18 @@ YubiKey ceremony with mocked evidence in a submitted demo.
 - A valid signature proves the exact approval ceremony; it does not certify the
   maintenance decision or make AI-generated guidance correct.
 - All service requests and equipment details are synthetic demo content.
+- This is read-only assistance: it does not claim production readiness for
+  SQLite or control shop-floor equipment. A future SAP PM notification/work
+  order, MES event, or CMMS request is only a boundary trigger; the signed,
+  auditable release returns to the system of record.
+
+## SAP / MES discovery for the rehearsal
+
+Ask the operations lead which SAP PM, MES, or CMMS object should trigger the first workflow;
+which interface is acceptable (event, IDoc, BAPI, or OData); what must remain
+on premises; and which acceptance and audit-record operations are required.
+The answer determines the boundary adapter, not the governed task, runtime
+profile, policy, or human approval boundary.
 
 ## YubiKey 5.8 learnings
 
